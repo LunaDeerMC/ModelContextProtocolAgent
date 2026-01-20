@@ -1,0 +1,6 @@
+name: Model Context Protocol Agent
+version: @version@
+main: cn.lunadeer.mc.modelContextProtocolAgent.ModelContextProtocolAgent
+api-version: '1.20'
+folia-supported: true
+libraries: [ ]
