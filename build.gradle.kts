@@ -10,7 +10,7 @@ plugins {
 
 var buildFull = properties["buildFull"].toString() == "true"
 var libraries = listOf<String>()
-//libraries += "org.postgresql:postgresql:42.7.2"
+libraries += "net.kyori:adventure-platform-bukkit:4.3.3"
 
 // beta or alpha based on git branch
 var suffixes = getAndIncrementVersion()

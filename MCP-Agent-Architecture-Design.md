@@ -101,14 +101,14 @@ MCP Agent 是运行在 Minecraft 服务端的插件，作为 MCP 能力的提供
 │  ┌───────────────────────────────────▼───────────────────────────────────┐  │
 │  │                 Communication Layer (通信层)                           │  │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐   │  │
-│  │  │ WebSocket       │  │ Message         │  │   Connection        │   │  │
-│  │  │ Client          │  │ Codec           │  │   Manager           │   │  │
-│  │  │ (WS客户端)       │  │ (消息编解码器)   │  │   (连接管理器)       │   │  │
+│  │  │ WebSocket       │  │ Message         │  │   Session           │   │  │
+│  │  │ Server          │  │ Codec           │  │   Manager           │   │  │
+│  │  │ (WS服务端)       │  │ (消息编解码器)   │  │   (会话管理器)       │   │  │
 │  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘   │  │
 │  │  ┌─────────────────┐  ┌─────────────────┐                            │  │
-│  │  │ Heartbeat       │  │ Reconnect       │                            │  │
-│  │  │ Handler         │  │ Strategy        │                            │  │
-│  │  │ (心跳处理器)     │  │ (重连策略)       │                            │  │
+│  │  │ Heartbeat       │  │ Auth            │                            │  │
+│  │  │ Handler         │  │ Handler         │                            │  │
+│  │  │ (心跳处理器)     │  │ (认证处理器)     │                            │  │
 │  │  └─────────────────┘  └─────────────────┘                            │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                      │                                       │
@@ -205,8 +205,10 @@ public interface McpEventEmitter {
 | `/mcp providers` | 列出所有 Provider | `mcp.admin.providers` |
 | `/mcp capabilities` | 列出所有能力 | `mcp.admin.capabilities` |
 | `/mcp test <capability>` | 测试能力执行 | `mcp.admin.test` |
-| `/mcp disconnect` | 断开 Gateway 连接 | `mcp.admin.connection` |
-| `/mcp connect` | 连接 Gateway | `mcp.admin.connection` |
+| `/mcp sessions` | 列出所有 Gateway 连接会话 | `mcp.admin.sessions` |
+| `/mcp kick <sessionId>` | 断开指定 Gateway 连接 | `mcp.admin.sessions` |
+| `/mcp server start` | 启动 WebSocket 服务 | `mcp.admin.server` |
+| `/mcp server stop` | 停止 WebSocket 服务 | `mcp.admin.server` |
 
 ---
 
@@ -1177,20 +1179,27 @@ public class RateLimiter {
 
 #### 3.5.1 整体通信架构
 
+Agent 作为 WebSocket 服务端运行，Gateway 主动连接 Agent。这种架构设计的优势：
+
+1. **便于管理**：Gateway 可在界面中灵活添加、删除、管理多个服务器的 Agent
+2. **动态发现**：Gateway 可根据配置随时连接新的 Agent 节点
+3. **集中控制**：Gateway 作为控制中心，统一管理所有 Agent 连接
+4. **简化部署**：Agent 只需暴露端口，无需知道 Gateway 地址
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      Communication Layer                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐       │
-│   │   WebSocket   │    │   Message     │    │  Connection   │       │
-│   │    Client     │◀──▶│    Codec      │◀──▶│   Manager   │       │
+│   │   WebSocket   │    │   Message     │    │   Session     │       │
+│   │    Server     │◀──▶│    Codec      │◀──▶│   Manager     │       │
 │   └───────┬───────┘    └───────────────┘    └───────┬───────┘       │
 │           │                                         │               │
 │           ▼                                         ▼               │
 │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐       │
-│   │   Heartbeat   │    │   Message     │    │   Reconnect   │       │
-│   │   Handler     │    │   Router      │    │   Strategy    │       │
+│   │   Heartbeat   │    │   Message     │    │     Auth      │       │
+│   │   Handler     │    │   Router      │    │   Handler     │       │
 │   └───────────────┘    └───────┬───────┘    └───────────────┘       │
 │                                │                                    │
 │                                ▼                                    │
@@ -1205,58 +1214,94 @@ public class RateLimiter {
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 3.5.2 WebSocket Client
+#### 3.5.2 WebSocket Server
+
+Agent 作为 WebSocket 服务端，监听指定端口，等待 Gateway 连接：
 
 ```java
-public class GatewayWebSocketClient {
-    private final URI gatewayUri;
-    private final ConnectionManager connectionManager;
+public class AgentWebSocketServer {
+    private final int port;
+    private final String host;
+    private final SessionManager sessionManager;
+    private final AuthHandler authHandler;
     private final MessageCodec codec;
     private final MessageRouter router;
-    private WebSocket webSocket;
+    private HttpServer httpServer;
     
     /**
-     * 连接到 Gateway
+     * 启动 WebSocket 服务
      */
-    public CompletableFuture<Void> connect() {
-        return HttpClient.newHttpClient()
-            .newWebSocketBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .buildAsync(gatewayUri, new WebSocketListener())
-            .thenAccept(ws -> {
-                this.webSocket = ws;
-                connectionManager.onConnected();
-                performHandshake();
-            });
-    }
-    
-    /**
-     * 发送消息
-     */
-    public CompletableFuture<Void> send(McpMessage message) {
-        String json = codec.encode(message);
-        return webSocket.sendText(json, true)
-            .thenAccept(ws -> {});
-    }
-    
-    /**
-     * 发送请求并等待响应
-     */
-    public <T> CompletableFuture<T> request(McpRequest request, Class<T> responseType) {
-        CompletableFuture<T> future = new CompletableFuture<>();
-        pendingRequests.put(request.getId(), new PendingRequest<>(future, responseType));
-        
-        send(request).exceptionally(ex -> {
-            pendingRequests.remove(request.getId());
-            future.completeExceptionally(ex);
-            return null;
+    public CompletableFuture<Void> start() {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                httpServer = HttpServer.create(
+                    new InetSocketAddress(host, port), 0);
+                httpServer.createContext("/ws", new WebSocketUpgradeHandler());
+                httpServer.setExecutor(Executors.newCachedThreadPool());
+                httpServer.start();
+                logger.info("MCP Agent WebSocket 服务已启动，监听 {}:{}", host, port);
+            } catch (IOException e) {
+                throw new RuntimeException("WebSocket 服务启动失败", e);
+            }
         });
-        
-        return future.orTimeout(30, TimeUnit.SECONDS);
     }
     
-    private class WebSocketListener implements WebSocket.Listener {
+    /**
+     * 停止 WebSocket 服务
+     */
+    public void stop() {
+        if (httpServer != null) {
+            // 断开所有连接
+            sessionManager.closeAllSessions("服务关闭");
+            httpServer.stop(5);
+            logger.info("MCP Agent WebSocket 服务已停止");
+        }
+    }
+    
+    /**
+     * 向指定会话发送消息
+     */
+    public CompletableFuture<Void> send(String sessionId, McpMessage message) {
+        GatewaySession session = sessionManager.getSession(sessionId);
+        if (session == null) {
+            return CompletableFuture.failedFuture(
+                new SessionNotFoundException("会话不存在: " + sessionId));
+        }
+        String json = codec.encode(message);
+        return session.send(json);
+    }
+    
+    /**
+     * 向所有已认证会话广播消息
+     */
+    public void broadcast(McpMessage message) {
+        String json = codec.encode(message);
+        sessionManager.getAuthenticatedSessions().forEach(session -> {
+            session.send(json).exceptionally(ex -> {
+                logger.warn("向会话 {} 广播消息失败", session.getId(), ex);
+                return null;
+            });
+        });
+    }
+    
+    /**
+     * WebSocket 连接处理器
+     */
+    private class WebSocketHandler implements WebSocket.Listener {
+        private final GatewaySession session;
         private StringBuilder buffer = new StringBuilder();
+        
+        public WebSocketHandler(GatewaySession session) {
+            this.session = session;
+        }
+        
+        @Override
+        public void onOpen(WebSocket webSocket) {
+            logger.info("Gateway 连接已建立: {}", session.getId());
+            sessionManager.addSession(session);
+            // 等待认证消息
+            webSocket.request(1);
+        }
         
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, 
@@ -1266,7 +1311,7 @@ public class GatewayWebSocketClient {
             if (last) {
                 String message = buffer.toString();
                 buffer = new StringBuilder();
-                handleMessage(message);
+                handleMessage(session, message);
             }
             webSocket.request(1);
             return null;
@@ -1276,19 +1321,52 @@ public class GatewayWebSocketClient {
         public CompletionStage<?> onClose(WebSocket webSocket, 
                                           int statusCode, 
                                           String reason) {
-            connectionManager.onDisconnected(statusCode, reason);
+            logger.info("Gateway 连接已断开: {}, 原因: {}", session.getId(), reason);
+            sessionManager.removeSession(session.getId());
             return null;
         }
         
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
-            connectionManager.onError(error);
+            logger.error("WebSocket 连接错误: {}", session.getId(), error);
+            sessionManager.removeSession(session.getId());
         }
     }
     
-    private void handleMessage(String json) {
+    private void handleMessage(GatewaySession session, String json) {
         McpMessage message = codec.decode(json);
+        
+        // 未认证会话只能处理认证消息
+        if (!session.isAuthenticated()) {
+            if (message instanceof AuthRequest authRequest) {
+                handleAuth(session, authRequest);
+            } else {
+                session.close(4001, "未认证");
+            }
+            return;
+        }
+        
+        // 设置消息上下文
+        message.setSessionId(session.getId());
+        message.setGatewayId(session.getGatewayId());
         router.route(message);
+    }
+    
+    private void handleAuth(GatewaySession session, AuthRequest authRequest) {
+        AuthResult result = authHandler.authenticate(authRequest);
+        if (result.isSuccess()) {
+            session.setAuthenticated(true);
+            session.setGatewayId(authRequest.getGatewayId());
+            session.setPermissions(result.getPermissions());
+            logger.info("Gateway {} 认证成功", authRequest.getGatewayId());
+            
+            // 发送认证成功响应及能力清单
+            sendAuthResponse(session, true, getCapabilityManifest());
+        } else {
+            logger.warn("Gateway 认证失败: {}", result.getReason());
+            sendAuthResponse(session, false, result.getReason());
+            session.close(4003, "认证失败");
+        }
     }
 }
 ```
@@ -1344,146 +1422,208 @@ public class MessageCodec {
 }
 ```
 
-#### 3.5.4 Connection Manager（连接管理器）
+#### 3.5.4 Session Manager（会话管理器）
+
+Session Manager 负责管理所有 Gateway 的连接会话：
 
 ```java
-public class ConnectionManager {
-    private final ReconnectStrategy reconnectStrategy;
-    private final AtomicReference<ConnectionState> state;
+public class SessionManager {
+    // 所有会话（包含未认证的）
+    private final ConcurrentMap<String, GatewaySession> sessions = new ConcurrentHashMap<>();
+    // 按 Gateway ID 索引的已认证会话
+    private final ConcurrentMap<String, GatewaySession> authenticatedSessions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler;
-    
-    public enum ConnectionState {
-        DISCONNECTED,
-        CONNECTING,
-        CONNECTED,
-        RECONNECTING
-    }
+    private final Duration sessionTimeout;
     
     /**
-     * 处理连接成功
+     * 添加会话
      */
-    public void onConnected() {
-        state.set(ConnectionState.CONNECTED);
-        reconnectStrategy.reset();
+    public void addSession(GatewaySession session) {
+        sessions.put(session.getId(), session);
         
-        // 发送注册消息
-        sendRegistration();
-        
-        // 启动心跳
-        startHeartbeat();
-    }
-    
-    /**
-     * 处理断开连接
-     */
-    public void onDisconnected(int statusCode, String reason) {
-        state.set(ConnectionState.DISCONNECTED);
-        stopHeartbeat();
-        
-        if (shouldReconnect(statusCode)) {
-            scheduleReconnect();
-        }
-    }
-    
-    /**
-     * 处理连接错误
-     */
-    public void onError(Throwable error) {
-        logger.error("WebSocket 连接错误", error);
-        
-        if (state.get() == ConnectionState.CONNECTED) {
-            onDisconnected(-1, error.getMessage());
-        }
-    }
-    
-    /**
-     * 调度重连
-     */
-    private void scheduleReconnect() {
-        state.set(ConnectionState.RECONNECTING);
-        
-        Duration delay = reconnectStrategy.nextDelay();
-        if (delay == null) {
-            logger.error("达到最大重连次数，停止重连");
-            return;
-        }
-        
-        logger.info("将在 {} 后尝试重连", delay);
+        // 设置认证超时
         scheduler.schedule(() -> {
-            wsClient.connect()
-                .exceptionally(ex -> {
-                    logger.error("重连失败", ex);
-                    scheduleReconnect();
-                    return null;
-                });
-        }, delay.toMillis(), TimeUnit.MILLISECONDS);
+            if (!session.isAuthenticated()) {
+                logger.warn("会话 {} 认证超时，关闭连接", session.getId());
+                session.close(4002, "认证超时");
+                removeSession(session.getId());
+            }
+        }, 30, TimeUnit.SECONDS);
+    }
+    
+    /**
+     * 移除会话
+     */
+    public void removeSession(String sessionId) {
+        GatewaySession session = sessions.remove(sessionId);
+        if (session != null && session.getGatewayId() != null) {
+            authenticatedSessions.remove(session.getGatewayId());
+        }
+    }
+    
+    /**
+     * 标记会话已认证
+     */
+    public void markAuthenticated(GatewaySession session) {
+        session.setAuthenticated(true);
+        authenticatedSessions.put(session.getGatewayId(), session);
+    }
+    
+    /**
+     * 获取会话
+     */
+    public GatewaySession getSession(String sessionId) {
+        return sessions.get(sessionId);
+    }
+    
+    /**
+     * 根据 Gateway ID 获取会话
+     */
+    public GatewaySession getSessionByGatewayId(String gatewayId) {
+        return authenticatedSessions.get(gatewayId);
+    }
+    
+    /**
+     * 获取所有已认证会话
+     */
+    public Collection<GatewaySession> getAuthenticatedSessions() {
+        return Collections.unmodifiableCollection(authenticatedSessions.values());
+    }
+    
+    /**
+     * 获取连接统计
+     */
+    public SessionStats getStats() {
+        return SessionStats.builder()
+            .totalSessions(sessions.size())
+            .authenticatedSessions(authenticatedSessions.size())
+            .build();
+    }
+    
+    /**
+     * 关闭所有会话
+     */
+    public void closeAllSessions(String reason) {
+        sessions.values().forEach(session -> {
+            session.close(1001, reason);
+        });
+        sessions.clear();
+        authenticatedSessions.clear();
     }
 }
-```
 
-#### 3.5.5 Reconnect Strategy（重连策略）
+/**
+ * Gateway 会话
+ */
+public class GatewaySession {
+    private final String id;
+    private final WebSocket webSocket;
+    private final Instant connectedAt;
+    
+    private volatile boolean authenticated = false;
+    private volatile String gatewayId;
+    private volatile Set<String> permissions;
+    private volatile Instant lastActivityAt;
+    
+    public CompletableFuture<Void> send(String message) {
+        return webSocket.sendText(message, true)
+            .thenAccept(ws -> lastActivityAt = Instant.now());
+    }
+    
+    public void close(int statusCode, String reason) {
+        webSocket.sendClose(statusCode, reason);
+    }
+}
+
+#### 3.5.5 Auth Handler（认证处理器）
+
+Agent 作为服务端，需要验证连接的 Gateway 身份：
 
 ```java
-public class ExponentialBackoffReconnectStrategy implements ReconnectStrategy {
-    private final Duration initialDelay;
-    private final Duration maxDelay;
-    private final double multiplier;
-    private final int maxRetries;
+public class AuthHandler {
+    private final McpAgentConfig config;
+    private final PermissionManager permissionManager;
     
-    private int retryCount = 0;
-    private Duration currentDelay;
-    
-    public ExponentialBackoffReconnectStrategy() {
-        this.initialDelay = Duration.ofSeconds(1);
-        this.maxDelay = Duration.ofMinutes(5);
-        this.multiplier = 2.0;
-        this.maxRetries = 10;
-        this.currentDelay = initialDelay;
-    }
-    
-    @Override
-    public Duration nextDelay() {
-        if (retryCount >= maxRetries) {
-            return null; // 停止重连
+    /**
+     * 验证 Gateway 连接
+     */
+    public AuthResult authenticate(AuthRequest request) {
+        // 1. 验证 Token
+        if (!validateToken(request.getToken())) {
+            return AuthResult.failure("Token 无效");
         }
         
-        Duration delay = currentDelay;
+        // 2. 检查 Gateway ID 是否在白名单中（可选）
+        if (config.getSecurity().isEnableGatewayWhitelist()) {
+            if (!isGatewayAllowed(request.getGatewayId())) {
+                return AuthResult.failure("Gateway 不在白名单中");
+            }
+        }
         
-        // 计算下次延迟（指数退避 + 随机抖动）
-        long nextDelayMs = (long) (currentDelay.toMillis() * multiplier);
-        nextDelayMs += ThreadLocalRandom.current().nextLong(1000); // 随机抖动
-        currentDelay = Duration.ofMillis(Math.min(nextDelayMs, maxDelay.toMillis()));
+        // 3. 获取权限
+        Set<String> permissions = permissionManager
+            .getGatewayPermissions(request.getGatewayId());
         
-        retryCount++;
-        return delay;
+        return AuthResult.success(permissions);
     }
     
-    @Override
-    public void reset() {
-        retryCount = 0;
-        currentDelay = initialDelay;
+    private boolean validateToken(String token) {
+        String expectedToken = config.getServer().getAuthToken();
+        if (expectedToken == null || expectedToken.isBlank()) {
+            // 未配置 Token，允许所有连接（仅建议开发环境）
+            logger.warn("Agent 未配置认证 Token，允许所有连接");
+            return true;
+        }
+        return expectedToken.equals(token);
+    }
+    
+    private boolean isGatewayAllowed(String gatewayId) {
+        return config.getSecurity().getGatewayWhitelist()
+            .contains(gatewayId);
     }
 }
-```
+
+@Data
+@Builder
+public class AuthResult {
+    private final boolean success;
+    private final String reason;
+    private final Set<String> permissions;
+    
+    public static AuthResult success(Set<String> permissions) {
+        return AuthResult.builder()
+            .success(true)
+            .permissions(permissions)
+            .build();
+    }
+    
+    public static AuthResult failure(String reason) {
+        return AuthResult.builder()
+            .success(false)
+            .reason(reason)
+            .build();
+    }
+}
 
 #### 3.5.6 Heartbeat Handler（心跳处理器）
+
+心跳处理器负责监控所有 Gateway 连接的健康状态：
 
 ```java
 public class HeartbeatHandler {
     private final ScheduledExecutorService scheduler;
-    private final GatewayWebSocketClient wsClient;
+    private final SessionManager sessionManager;
     private final Duration interval;
     private final Duration timeout;
     
     private ScheduledFuture<?> heartbeatTask;
-    private Instant lastPongTime;
     
     /**
-     * 启动心跳
+     * 启动心跳监控
      */
     public void start() {
         heartbeatTask = scheduler.scheduleAtFixedRate(
-            this::sendHeartbeat,
+            this::checkAllSessions,
             interval.toMillis(),
             interval.toMillis(),
             TimeUnit.MILLISECONDS
@@ -1491,7 +1631,7 @@ public class HeartbeatHandler {
     }
     
     /**
-     * 停止心跳
+     * 停止心跳监控
      */
     public void stop() {
         if (heartbeatTask != null) {
@@ -1501,32 +1641,47 @@ public class HeartbeatHandler {
     }
     
     /**
+     * 检查所有会话心跳
+     */
+    private void checkAllSessions() {
+        Instant now = Instant.now();
+        
+        sessionManager.getAuthenticatedSessions().forEach(session -> {
+            // 检查上次心跳响应时间
+            if (session.getLastHeartbeatAt() != null && 
+                Duration.between(session.getLastHeartbeatAt(), now).compareTo(timeout) > 0) {
+                logger.warn("Gateway {} 心跳超时，关闭连接", session.getGatewayId());
+                session.close(4000, "心跳超时");
+                sessionManager.removeSession(session.getId());
+                return;
+            }
+            
+            // 发送心跳请求
+            sendHeartbeat(session);
+        });
+    }
+    
+    /**
      * 发送心跳
      */
-    private void sendHeartbeat() {
-        // 检查上次心跳响应
-        if (lastPongTime != null && 
-            Duration.between(lastPongTime, Instant.now()).compareTo(timeout) > 0) {
-            logger.warn("心跳超时，触发重连");
-            wsClient.reconnect();
-            return;
-        }
-        
+    private void sendHeartbeat(GatewaySession session) {
         HeartbeatMessage heartbeat = HeartbeatMessage.builder()
             .agentId(config.getAgentId())
-            .sessionId(sessionId)
             .timestamp(Instant.now())
             .status(buildStatus())
             .build();
         
-        wsClient.send(heartbeat);
+        session.send(codec.encode(heartbeat));
     }
     
     /**
      * 处理心跳响应
      */
-    public void onPong(HeartbeatAck ack) {
-        lastPongTime = Instant.now();
+    public void onHeartbeatAck(String sessionId, HeartbeatAck ack) {
+        GatewaySession session = sessionManager.getSession(sessionId);
+        if (session != null) {
+            session.setLastHeartbeatAt(Instant.now());
+        }
     }
     
     private AgentStatus buildStatus() {
@@ -1535,6 +1690,7 @@ public class HeartbeatHandler {
             .tps(Bukkit.getTPS()[0])
             .onlinePlayers(Bukkit.getOnlinePlayers().size())
             .memoryUsage(getMemoryUsage())
+            .connectedGateways(sessionManager.getAuthenticatedSessions().size())
             .build();
     }
 }
@@ -1585,23 +1741,27 @@ public class ConfigManager {
 
 @Data
 public class McpAgentConfig {
-    private GatewayConfig gateway;
+    private ServerConfig server;
     private SecurityConfig security;
     private StorageConfig storage;
     private LoggingConfig logging;
     
     @Data
-    public static class GatewayConfig {
-        private String url = "ws://localhost:8765";
-        private String token;
+    public static class ServerConfig {
+        private String host = "0.0.0.0";
+        private int port = 8765;
+        private String authToken;
         private int heartbeatInterval = 30000;
-        private int reconnectMaxRetries = 10;
+        private int heartbeatTimeout = 90000;
+        private int maxConnections = 10;
     }
     
     @Data
     public static class SecurityConfig {
         private boolean enableDoubleCheck = true;
         private int snapshotRetentionDays = 7;
+        private boolean enableGatewayWhitelist = false;
+        private List<String> gatewayWhitelist = new ArrayList<>();
         private Map<String, RateLimitRule> rateLimits;
     }
     
@@ -1618,17 +1778,23 @@ public class McpAgentConfig {
 ```yaml
 # MCP Agent Configuration
 
-# Gateway 连接配置
-gateway:
-  url: "ws://localhost:8765"
-  token: "your-auth-token-here"
+# WebSocket 服务配置
+server:
+  host: "0.0.0.0"         # 监听地址，0.0.0.0 表示所有网卡
+  port: 8765              # 监听端口
+  auth-token: "your-auth-token-here"  # 认证 Token，Gateway 连接时需提供
   heartbeat-interval: 30000  # 心跳间隔（毫秒）
-  reconnect-max-retries: 10  # 最大重连次数
+  heartbeat-timeout: 90000   # 心跳超时（毫秒）
+  max-connections: 10        # 最大 Gateway 连接数
 
 # 安全配置
 security:
   enable-double-check: true  # 启用 Agent 侧二次权限校验
   snapshot-retention-days: 7  # 快照保留天数
+  enable-gateway-whitelist: false  # 是否启用 Gateway 白名单
+  gateway-whitelist:          # Gateway 白名单（仅当启用白名单时生效）
+    - "gateway-main"
+    - "gateway-backup"
   
   # 限流配置
   rate-limits:
@@ -2092,9 +2258,11 @@ mcp-agent/
 │   │       │   ├── RateLimiter.java
 │   │       │   └── SandboxExecutor.java
 │   │       ├── communication/                # 通信层
-│   │       │   ├── GatewayWebSocketClient.java
+│   │       │   ├── AgentWebSocketServer.java
 │   │       │   ├── MessageCodec.java
-│   │       │   ├── ConnectionManager.java
+│   │       │   ├── SessionManager.java
+│   │       │   ├── GatewaySession.java
+│   │       │   ├── AuthHandler.java
 │   │       │   ├── HeartbeatHandler.java
 │   │       │   └── handler/
 │   │       └── infrastructure/               # 基础设施层
@@ -2138,9 +2306,10 @@ io.mcp.minecraft.agent
 │   ├── rollback             # 回滚处理
 │   └── ratelimit            # 限流控制
 ├── communication            # 通信层
-│   ├── websocket            # WebSocket 客户端
+│   ├── server               # WebSocket 服务端
 │   ├── codec                # 消息编解码
-│   ├── connection           # 连接管理
+│   ├── session              # 会话管理
+│   ├── auth                 # 认证处理
 │   └── handler              # 消息处理器
 ├── infrastructure           # 基础设施
 │   ├── config               # 配置管理
@@ -2220,12 +2389,14 @@ io.mcp.minecraft.agent
            │
            ▼
   ┌─────────────────┐
-  │ 9. 连接 Gateway │
+  │ 9. 启动 WebSocket │
+  │    服务          │
   └────────┬────────┘
            │
            ▼
   ┌─────────────────┐
   │ 10. 插件启动完成│
+  │ 等待 Gateway 连接│
   └─────────────────┘
 ```
 
@@ -2476,14 +2647,16 @@ class WorldProviderTest {
 
 1. 将 `mcp-agent-core.jar` 放入 `plugins/` 目录
 2. 启动服务器生成默认配置
-3. 编辑 `plugins/McpAgent/config.yml` 配置 Gateway 地址和认证信息
+3. 编辑 `plugins/McpAgent/config.yml` 配置 WebSocket 服务端口和认证 Token
 4. 重启服务器或执行 `/mcp reload`
+5. 在 Gateway 管理界面添加 Agent 连接地址（如 `ws://server-ip:8765`）
 
 ### 9.3 监控指标
 
 | 指标 | 说明 | 告警阈值 |
 |------|------|----------|
-| `mcp.connection.status` | 连接状态 | disconnected |
+| `mcp.server.status` | 服务状态 | stopped |
+| `mcp.sessions.active` | 活跃 Gateway 连接数 | - |
 | `mcp.requests.total` | 请求总数 | - |
 | `mcp.requests.errors` | 错误请求数 | > 10/min |
 | `mcp.requests.latency` | 请求延迟 | > 1000ms |
@@ -2519,9 +2692,10 @@ logging:
 
 ### 10.1 认证与授权
 
-- Gateway 连接使用 Token 认证
+- Agent 作为 WebSocket 服务端，使用 Token 验证 Gateway 连接
+- 支持 Gateway 白名单机制，限制允许连接的 Gateway
 - 支持 Agent 侧二次权限校验
-- 能力调用携带调用者身份信息
+- 能力调用携带调用者身份信息（由 Gateway 传递）
 
 ### 10.2 数据安全
 
@@ -2574,21 +2748,21 @@ logging:
         <version>1.20.4-R0.1-SNAPSHOT</version>
         <scope>provided</scope>
     </dependency>
-    
+
     <!-- JSON Processing -->
     <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>2.16.0</version>
     </dependency>
-    
+
     <!-- JSON Schema Validation -->
     <dependency>
         <groupId>com.networknt</groupId>
         <artifactId>json-schema-validator</artifactId>
         <version>1.0.87</version>
     </dependency>
-    
+
     <!-- Vault Economy API -->
     <dependency>
         <groupId>com.github.MilkBowl</groupId>
@@ -2596,7 +2770,7 @@ logging:
         <version>1.7.1</version>
         <scope>provided</scope>
     </dependency>
-    
+
     <!-- Lombok -->
     <dependency>
         <groupId>org.projectlombok</groupId>
@@ -2604,7 +2778,7 @@ logging:
         <version>1.18.30</version>
         <scope>provided</scope>
     </dependency>
-    
+
     <!-- Testing -->
     <dependency>
         <groupId>org.junit.jupiter</groupId>
