@@ -2,6 +2,7 @@ package cn.lunadeer.mc.modelContextProtocolAgent.communication.session;
 
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -19,6 +20,16 @@ import java.util.concurrent.TimeUnit;
  * @since 1.0.0
  */
 public class SessionManager {
+
+    public static class SessionManagerText extends ConfigurationPart {
+        public String sessionAdded = "Added session {0} for gateway {1}";
+        public String sessionRemoved = "Removed session {0} for gateway {1}";
+        public String sessionAuthTimeout = "Session {0} authentication timeout, closing connection";
+        public String gatewayAuthenticated = "Gateway {0} authenticated successfully with {1} permissions";
+        public String closedAllSessions = "Closed all sessions: {0}";
+        public String removingStaleSession = "Removing stale session {0} (inactive for {1}s)";
+        public String sessionCleanupError = "Error in session cleanup task: {0}";
+    }
     private final Map<String, GatewaySession> sessions = new ConcurrentHashMap<>();
     private final Map<String, GatewaySession> authenticatedSessions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler;
@@ -37,12 +48,12 @@ public class SessionManager {
      */
     public void addSession(GatewaySession session) {
         sessions.put(session.getId(), session);
-        XLogger.debug(I18n.communicationText.sessionAdded, session.getId(), session.getGatewayId());
+        XLogger.debug(I18n.sessionManagerText.sessionAdded, session.getId(), session.getGatewayId());
 
         // Schedule authentication timeout check
         scheduler.schedule(() -> {
             if (!session.isAuthenticated()) {
-                XLogger.warn(I18n.communicationText.sessionAuthTimeout, session.getId());
+                XLogger.warn(I18n.sessionManagerText.sessionAuthTimeout, session.getId());
                 session.close(4002, "Authentication timeout");
                 removeSession(session.getId());
             }
@@ -58,7 +69,7 @@ public class SessionManager {
         GatewaySession session = sessions.remove(sessionId);
         if (session != null && session.getGatewayId() != null) {
             authenticatedSessions.remove(session.getGatewayId());
-            XLogger.debug(I18n.communicationText.sessionRemoved, sessionId, session.getGatewayId());
+            XLogger.debug(I18n.sessionManagerText.sessionRemoved, sessionId, session.getGatewayId());
         }
     }
 
@@ -70,7 +81,7 @@ public class SessionManager {
     public void markAuthenticated(GatewaySession session) {
         session.setAuthenticated(true);
         authenticatedSessions.put(session.getGatewayId(), session);
-        XLogger.info(I18n.communicationText.gatewayAuthenticated, session.getGatewayId(), session.getPermissions().size());
+        XLogger.info(I18n.sessionManagerText.gatewayAuthenticated, session.getGatewayId(), session.getPermissions().size());
     }
 
     /**
@@ -134,7 +145,7 @@ public class SessionManager {
         });
         sessions.clear();
         authenticatedSessions.clear();
-        XLogger.info(I18n.communicationText.closedAllSessions, reason);
+        XLogger.info(I18n.sessionManagerText.closedAllSessions, reason);
     }
 
     /**
@@ -150,7 +161,7 @@ public class SessionManager {
                                 session.getLastActivityAt(), now
                         ).getSeconds();
                         if (inactiveSeconds > sessionTimeoutSeconds) {
-                            XLogger.debug(I18n.communicationText.removingStaleSession,
+                            XLogger.debug(I18n.sessionManagerText.removingStaleSession,
                                     session.getId(), inactiveSeconds);
                             session.close(4000, "Session timeout");
                             if (session.getGatewayId() != null) {
@@ -162,7 +173,7 @@ public class SessionManager {
                     return false;
                 });
             } catch (Exception e) {
-                XLogger.error(I18n.communicationText.sessionCleanupError, e.getMessage());
+                XLogger.error(I18n.sessionManagerText.sessionCleanupError, e.getMessage());
             }
         }, 60, 60, TimeUnit.SECONDS);
     }

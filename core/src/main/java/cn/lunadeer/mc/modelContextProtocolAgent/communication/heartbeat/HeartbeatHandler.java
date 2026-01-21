@@ -8,6 +8,7 @@ import cn.lunadeer.mc.modelContextProtocolAgent.communication.session.GatewaySes
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.session.SessionManager;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.scheduler.Scheduler;
 import org.bukkit.Bukkit;
 
@@ -21,6 +22,15 @@ import java.util.UUID;
  * @since 1.0.0
  */
 public class HeartbeatHandler {
+
+    public static class HeartbeatHandlerText extends ConfigurationPart {
+        public String heartbeatHandlerStarted = "Heartbeat handler started (interval: {0}ms, timeout: {1}ms)";
+        public String gatewayHeartbeatTimeout = "Gateway {0} heartbeat timeout (elapsed: {1}ms), closing connection";
+        public String heartbeatCheckError = "Error in heartbeat check: {0}";
+        public String heartbeatSendFailed = "Failed to send heartbeat to gateway {0}: {1}";
+        public String heartbeatSendError = "Error sending heartbeat to gateway {0}: {1}";
+        public String heartbeatAckReceived = "Received heartbeat ack from gateway {0}";
+    }
     private final SessionManager sessionManager;
     private final long intervalMs;
     private final long timeoutMs;
@@ -39,7 +49,7 @@ public class HeartbeatHandler {
         long initialDelayTicks = intervalTicks;
 
         Scheduler.runTaskRepeatAsync(this::checkAllSessions, initialDelayTicks, intervalTicks);
-        XLogger.info(I18n.communicationText.heartbeatHandlerStarted, intervalMs, timeoutMs);
+        XLogger.info(I18n.heartbeatHandlerText.heartbeatHandlerStarted, intervalMs, timeoutMs);
     }
 
     /**
@@ -57,7 +67,7 @@ public class HeartbeatHandler {
                     ).toMillis();
 
                     if (elapsedMs > timeoutMs) {
-                        XLogger.warn(I18n.communicationText.gatewayHeartbeatTimeout,
+                        XLogger.warn(I18n.heartbeatHandlerText.gatewayHeartbeatTimeout,
                                 session.getGatewayId(), elapsedMs);
                         session.close(4000, "Heartbeat timeout");
                         sessionManager.removeSession(session.getId());
@@ -69,7 +79,7 @@ public class HeartbeatHandler {
                 sendHeartbeat(session);
             }
         } catch (Exception e) {
-            XLogger.error(I18n.communicationText.heartbeatCheckError, e.getMessage());
+            XLogger.error(I18n.heartbeatHandlerText.heartbeatCheckError, e.getMessage());
         }
     }
 
@@ -88,12 +98,12 @@ public class HeartbeatHandler {
                     .build();
 
             session.send(heartbeat.toString()).exceptionally(ex -> {
-                XLogger.error(I18n.communicationText.heartbeatSendFailed,
+                XLogger.error(I18n.heartbeatHandlerText.heartbeatSendFailed,
                         session.getGatewayId(), ex.getMessage());
                 return null;
             });
         } catch (Exception e) {
-            XLogger.error(I18n.communicationText.heartbeatSendError,
+            XLogger.error(I18n.heartbeatHandlerText.heartbeatSendError,
                     session.getGatewayId(), e.getMessage());
         }
     }
@@ -108,7 +118,7 @@ public class HeartbeatHandler {
         GatewaySession session = sessionManager.getSession(sessionId);
         if (session != null) {
             session.setLastHeartbeatAt(Instant.now());
-            XLogger.debug(I18n.communicationText.heartbeatAckReceived, session.getGatewayId());
+            XLogger.debug(I18n.heartbeatHandlerText.heartbeatAckReceived, session.getGatewayId());
         }
     }
 

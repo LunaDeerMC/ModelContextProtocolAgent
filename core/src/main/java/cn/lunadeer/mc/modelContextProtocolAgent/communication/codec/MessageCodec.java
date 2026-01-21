@@ -3,6 +3,7 @@ package cn.lunadeer.mc.modelContextProtocolAgent.communication.codec;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.message.*;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -11,7 +12,6 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
 import java.time.Instant;
-import java.util.UUID;
 
 /**
  * Message codec for encoding and decoding MCP messages.
@@ -21,6 +21,13 @@ import java.util.UUID;
  * @since 1.0.0
  */
 public class MessageCodec {
+
+    public static class MessageCodecText extends ConfigurationPart {
+        public String codecEncodeFailed = "Failed to encode message: {0}";
+        public String codecDecodeJsonFailed = "Failed to decode JSON: {0}";
+        public String codecDecodeMessageFailed = "Failed to decode message: {0}";
+    }
+
     private final Gson gson;
 
     public MessageCodec() {
@@ -47,7 +54,7 @@ public class MessageCodec {
                     .build();
             return gson.toJson(frame);
         } catch (Exception e) {
-            XLogger.error(I18n.communicationText.codecEncodeFailed, e.getMessage());
+            XLogger.error(I18n.messageCodecText.codecEncodeFailed, e.getMessage());
             throw new CodecException("Message encoding failed", e);
         }
     }
@@ -75,10 +82,10 @@ public class MessageCodec {
             }
             return message;
         } catch (JsonSyntaxException e) {
-            XLogger.error(I18n.communicationText.codecDecodeJsonFailed, e.getMessage());
+            XLogger.error(I18n.messageCodecText.codecDecodeJsonFailed, e.getMessage());
             throw new CodecException("Invalid JSON format", e);
         } catch (Exception e) {
-            XLogger.error(I18n.communicationText.codecDecodeMessageFailed, e.getMessage());
+            XLogger.error(I18n.messageCodecText.codecDecodeMessageFailed, e.getMessage());
             throw new CodecException("Message decoding failed", e);
         }
     }

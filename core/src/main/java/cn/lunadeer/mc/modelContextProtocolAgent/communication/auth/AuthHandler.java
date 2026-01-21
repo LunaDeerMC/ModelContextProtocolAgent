@@ -3,6 +3,7 @@ package cn.lunadeer.mc.modelContextProtocolAgent.communication.auth;
 import cn.lunadeer.mc.modelContextProtocolAgent.Configuration;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -15,6 +16,12 @@ import java.util.Set;
  */
 public class AuthHandler {
 
+    public static class AuthHandlerText extends ConfigurationPart {
+        public String authFailedInvalidToken = "Authentication failed for gateway {0}: Invalid token";
+        public String gatewayPassedWhitelist = "Gateway {0} passed whitelist check";
+        public String gatewayAuthenticated = "Gateway {0} authenticated successfully with {1} permissions";
+    }
+
     /**
      * Authenticates a Gateway connection.
      *
@@ -25,7 +32,7 @@ public class AuthHandler {
     public AuthResult authenticate(String gatewayId, String token) {
         // 1. Validate token
         if (!validateToken(token)) {
-            XLogger.warn(I18n.communicationText.authFailedInvalidToken, gatewayId);
+            XLogger.warn(I18n.authHandlerText.authFailedInvalidToken, gatewayId);
             return AuthResult.failure("Invalid token");
         }
 
@@ -33,13 +40,13 @@ public class AuthHandler {
         if (Configuration.websocketServer.maxConnections > 0) {
             // Note: In a real implementation, we'd check against a configured whitelist
             // For now, we accept any valid token
-            XLogger.debug(I18n.communicationText.gatewayPassedWhitelist, gatewayId);
+            XLogger.debug(I18n.authHandlerText.gatewayPassedWhitelist, gatewayId);
         }
 
         // 3. Grant permissions based on configuration
         Set<String> permissions = getGatewayPermissions(gatewayId);
 
-        XLogger.info(I18n.communicationText.gatewayAuthenticated, gatewayId, permissions.size());
+        XLogger.info(I18n.authHandlerText.gatewayAuthenticated, gatewayId, permissions.size());
 
         return AuthResult.success(permissions);
     }

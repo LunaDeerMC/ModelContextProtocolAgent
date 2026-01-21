@@ -1,6 +1,5 @@
 package cn.lunadeer.mc.modelContextProtocolAgent.communication.server;
 
-import cn.lunadeer.mc.modelContextProtocolAgent.Configuration;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.auth.AuthHandler;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.auth.AuthResult;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.codec.MessageCodec;
@@ -11,6 +10,7 @@ import cn.lunadeer.mc.modelContextProtocolAgent.communication.session.SessionMan
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.session.WebSocketConnection;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.scheduler.Scheduler;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.CapabilityManifest;
 import com.sun.net.httpserver.HttpServer;
@@ -34,6 +34,17 @@ import java.util.concurrent.CompletableFuture;
  * @since 1.0.0
  */
 public class AgentWebSocketServer {
+
+    public static class AgentWebSocketServerText extends ConfigurationPart {
+        public String wsServerStarted = "MCP Agent WebSocket server started on {0}:{1}";
+        public String wsServerFailed = "Failed to start WebSocket server: {0}";
+        public String wsBroadcastFailed = "Failed to broadcast to gateway {0}: {1}";
+        public String wsConnectionError = "Error handling connection from gateway {0}: {1}";
+        public String wsMessageHandlingError = "Failed to handle message from gateway {0}: {1}";
+        public String wsGatewayReauthAttempt = "Gateway {0} attempted re-authentication";
+        public String wsUnauthRequestAttempt = "Unauthenticated gateway {0} attempted request";
+        public String wsUnknownMessageType = "Unknown message type from gateway {0}: {1}";
+    }
     private final String host;
     private final int port;
     private final SessionManager sessionManager;
@@ -69,9 +80,9 @@ public class AgentWebSocketServer {
                 // Start heartbeat handler
                 heartbeatHandler.start();
 
-                XLogger.info(I18n.communicationText.wsServerStarted, host, port);
+                XLogger.info(I18n.agentWebSocketServerText.wsServerStarted, host, port);
             } catch (IOException e) {
-                XLogger.error(I18n.communicationText.wsServerFailed, e.getMessage());
+                XLogger.error(I18n.agentWebSocketServerText.wsServerFailed, e.getMessage());
                 throw new RuntimeException("WebSocket server startup failed", e);
             }
         });
@@ -117,7 +128,7 @@ public class AgentWebSocketServer {
         String json = messageCodec.encode(message);
         for (GatewaySession session : sessionManager.getAuthenticatedSessions()) {
             session.send(json).exceptionally(ex -> {
-                XLogger.warn(I18n.communicationText.wsBroadcastFailed,
+                XLogger.warn(I18n.agentWebSocketServerText.wsBroadcastFailed,
                         session.getGatewayId(), ex.getMessage());
                 return null;
             });
@@ -171,7 +182,7 @@ public class AgentWebSocketServer {
                 handleMessage(session, message);
             }
         } catch (Exception e) {
-            XLogger.error(I18n.communicationText.wsConnectionError,
+            XLogger.error(I18n.agentWebSocketServerText.wsConnectionError,
                     session.getGatewayId(), e.getMessage());
         } finally {
             sessionManager.removeSession(session.getId());
@@ -202,11 +213,11 @@ public class AgentWebSocketServer {
                     handleRequest(session, (McpRequest) message);
                     break;
                 default:
-                    XLogger.warn(I18n.communicationText.wsUnknownMessageType,
+                    XLogger.warn(I18n.agentWebSocketServerText.wsUnknownMessageType,
                             session.getGatewayId(), message.getType());
             }
         } catch (Exception e) {
-            XLogger.error(I18n.communicationText.wsMessageHandlingError,
+            XLogger.error(I18n.agentWebSocketServerText.wsMessageHandlingError,
                     session.getGatewayId(), e.getMessage());
         }
     }
@@ -216,7 +227,7 @@ public class AgentWebSocketServer {
      */
     private void handleAuth(GatewaySession session, AuthRequest request) {
         if (session.isAuthenticated()) {
-            XLogger.warn(I18n.communicationText.wsGatewayReauthAttempt, session.getGatewayId());
+            XLogger.warn(I18n.agentWebSocketServerText.wsGatewayReauthAttempt, session.getGatewayId());
             return;
         }
 
@@ -255,7 +266,7 @@ public class AgentWebSocketServer {
      */
     private void handleRequest(GatewaySession session, McpRequest request) {
         if (!session.isAuthenticated()) {
-            XLogger.warn(I18n.communicationText.wsUnauthRequestAttempt, session.getGatewayId());
+            XLogger.warn(I18n.agentWebSocketServerText.wsUnauthRequestAttempt, session.getGatewayId());
             return;
         }
 

@@ -2,6 +2,7 @@ package cn.lunadeer.mc.modelContextProtocolAgent.communication.session;
 
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 
 import java.time.Instant;
 import java.util.Set;
@@ -14,6 +15,10 @@ import java.util.concurrent.CompletableFuture;
  * @since 1.0.0
  */
 public class GatewaySession {
+
+    public static class GatewaySessionText extends ConfigurationPart {
+        public String closingSession = "Closing session {0} with code {1}: {2}";
+    }
     private final String id;
     private final WebSocketConnection connection;
     private final Instant connectedAt;
@@ -97,7 +102,7 @@ public class GatewaySession {
      * @param reason the close reason
      */
     public void close(int statusCode, String reason) {
-        XLogger.debug(I18n.communicationText.closingSession, id, statusCode, reason);
+        XLogger.debug(I18n.gatewaySessionText.closingSession, id, statusCode, reason);
         connection.close(statusCode, reason);
     }
 

@@ -3,6 +3,7 @@ package cn.lunadeer.mc.modelContextProtocolAgent.communication.router;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.message.McpMessage;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -14,6 +15,19 @@ import java.util.concurrent.CompletableFuture;
  */
 public class MessageRouter {
 
+    public static class MessageRouterText extends ConfigurationPart {
+        public String routerRoutingMessage = "Routing message type: {0} (id: {1})";
+        public String routerUnknownMessageType = "Unknown message type: {0}";
+        public String routerMessageError = "Error routing message {0}: {1}";
+        public String routerHandlingRequest = "Handling request: {0}";
+        public String routerHandlingResponse = "Handling response: {0}";
+        public String routerHandlingEvent = "Handling event: {0}";
+        public String routerHandlingHeartbeat = "Handling heartbeat: {0}";
+        public String routerHandlingHeartbeatAck = "Handling heartbeat_ack: {0}";
+        public String routerHandlingAuth = "Handling auth: {0}";
+        public String routerHandlingAuthResponse = "Handling auth_response: {0}";
+    }
+
     /**
      * Routes a message to the appropriate handler.
      *
@@ -24,7 +38,7 @@ public class MessageRouter {
         return CompletableFuture.runAsync(() -> {
             try {
                 String type = message.getType();
-                XLogger.debug(I18n.communicationText.routerRoutingMessage, type, message.getId());
+                XLogger.debug(I18n.messageRouterText.routerRoutingMessage, type, message.getId());
 
                 switch (type) {
                     case "request":
@@ -49,10 +63,10 @@ public class MessageRouter {
                         handleAuthResponse(message);
                         break;
                     default:
-                        XLogger.warn(I18n.communicationText.routerUnknownMessageType, type);
+                        XLogger.warn(I18n.messageRouterText.routerUnknownMessageType, type);
                 }
             } catch (Exception e) {
-                XLogger.error(I18n.communicationText.routerMessageError, message.getId(), e.getMessage());
+                XLogger.error(I18n.messageRouterText.routerMessageError, message.getId(), e.getMessage());
             }
         });
     }
@@ -61,7 +75,7 @@ public class MessageRouter {
      * Handles a request message.
      */
     private void handleRequest(McpMessage message) {
-        XLogger.debug(I18n.communicationText.routerHandlingRequest, message.getId());
+        XLogger.debug(I18n.messageRouterText.routerHandlingRequest, message.getId());
         // TODO: Forward to execution engine
     }
 
@@ -69,7 +83,7 @@ public class MessageRouter {
      * Handles a response message.
      */
     private void handleResponse(McpMessage message) {
-        XLogger.debug(I18n.communicationText.routerHandlingResponse, message.getId());
+        XLogger.debug(I18n.messageRouterText.routerHandlingResponse, message.getId());
         // TODO: Handle response (e.g., complete a future)
     }
 
@@ -77,7 +91,7 @@ public class MessageRouter {
      * Handles an event message.
      */
     private void handleEvent(McpMessage message) {
-        XLogger.debug(I18n.communicationText.routerHandlingEvent, message.getId());
+        XLogger.debug(I18n.messageRouterText.routerHandlingEvent, message.getId());
         // TODO: Forward to event dispatcher
     }
 
@@ -85,7 +99,7 @@ public class MessageRouter {
      * Handles a heartbeat message.
      */
     private void handleHeartbeat(McpMessage message) {
-        XLogger.debug(I18n.communicationText.routerHandlingHeartbeat, message.getId());
+        XLogger.debug(I18n.messageRouterText.routerHandlingHeartbeat, message.getId());
         // TODO: Send heartbeat acknowledgment
     }
 
@@ -93,7 +107,7 @@ public class MessageRouter {
      * Handles a heartbeat acknowledgment message.
      */
     private void handleHeartbeatAck(McpMessage message) {
-        XLogger.debug(I18n.communicationText.routerHandlingHeartbeatAck, message.getId());
+        XLogger.debug(I18n.messageRouterText.routerHandlingHeartbeatAck, message.getId());
         // TODO: Update last heartbeat time
     }
 
@@ -101,7 +115,7 @@ public class MessageRouter {
      * Handles an authentication message.
      */
     private void handleAuth(McpMessage message) {
-        XLogger.debug(I18n.communicationText.routerHandlingAuth, message.getId());
+        XLogger.debug(I18n.messageRouterText.routerHandlingAuth, message.getId());
         // TODO: Forward to auth handler
     }
 
@@ -109,7 +123,7 @@ public class MessageRouter {
      * Handles an authentication response message.
      */
     private void handleAuthResponse(McpMessage message) {
-        XLogger.debug(I18n.communicationText.routerHandlingAuthResponse, message.getId());
+        XLogger.debug(I18n.messageRouterText.routerHandlingAuthResponse, message.getId());
         // TODO: Handle auth response
     }
 }
