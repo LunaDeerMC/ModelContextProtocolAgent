@@ -2266,10 +2266,9 @@ mcp-agent/
 │   │       │   ├── HeartbeatHandler.java
 │   │       │   └── handler/
 │   │       └── infrastructure/               # 基础设施层
-│   │           ├── config/
+│   │           ├── configuration/
 │   │           ├── storage/
 │   │           ├── scheduler/
-│   │           ├── logging/
 │   │           └── metrics/
 │   ├── src/main/resources/
 │   │   ├── plugin.yml
@@ -2312,10 +2311,9 @@ io.mcp.minecraft.agent
 │   ├── auth                 # 认证处理
 │   └── handler              # 消息处理器
 ├── infrastructure           # 基础设施
-│   ├── config               # 配置管理
+│   ├── configuration        # 配置管理
 │   ├── storage              # 存储
 │   ├── scheduler            # 调度器
-│   ├── logging              # 日志
 │   └── metrics              # 指标
 └── util                     # 工具类
 ```
@@ -2328,7 +2326,7 @@ io.mcp.minecraft.agent
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      Plugin Startup Flow                             │
+│                      Plugin Startup Flow                            │
 └─────────────────────────────────────────────────────────────────────┘
 
   onLoad()
