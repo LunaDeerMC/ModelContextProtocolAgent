@@ -1,6 +1,8 @@
 package cn.lunadeer.mc.modelContextProtocolAgent.core.schema;
 
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.exception.McpValidationException;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.ErrorCode;
 
@@ -18,6 +20,33 @@ import java.util.Map;
  * @since 1.0.0
  */
 public class SchemaValidator {
+
+    /**
+     * Text definitions for SchemaValidator.
+     */
+    public static class SchemaValidatorText extends ConfigurationPart {
+        public String requiredParameterMissing = "Required parameter '{0}' is missing for capability: {1}";
+        public String parametersValidatedSuccessfully = "Parameters validated successfully for capability: {0}";
+        public String errorDuringParameterValidation = "Error during parameter validation for capability: {0}";
+        public String errorDuringParameterValidationDetail = "Error during parameter validation: {0}";
+        public String returnValueValidatedSuccessfully = "Return value validated successfully for capability: {0}";
+        public String errorDuringReturnValueValidation = "Error during return value validation for capability: {0}";
+        public String errorDuringReturnValueValidationDetail = "Error during return value validation: {0}";
+        public String parameterMustBeAtLeast = "Parameter '{0}' must be at least {1}";
+        public String parameterMustBeAtMost = "Parameter '{0}' must be at most {1}";
+        public String parameterDoesNotMatchPattern = "Parameter '{0}' does not match pattern: {1}";
+        public String invalidRegexPattern = "Invalid regex pattern for parameter '{0}': {1}";
+        public String mustBeAString = "{0} must be a string";
+        public String mustBeAnInteger = "{0} must be an integer";
+        public String mustBeANumber = "{0} must be a number";
+        public String mustBeABoolean = "{0} must be a boolean";
+        public String mustBeAnArray = "{0} must be an array";
+        public String mustBeAnObject = "{0} must be an object";
+        public String mustBeNull = "{0} must be null";
+        public String unknownType = "Unknown type '{0}' for {1}, skipping type validation";
+    }
+
+    public static SchemaValidatorText schemaValidatorText = new SchemaValidatorText();
 
     /**
      * Validates request parameters against the capability's parameter schema.
@@ -43,7 +72,7 @@ public class SchemaValidator {
                     if (!parameters.containsKey(paramName)) {
                         throw new McpValidationException(
                                 ErrorCode.PARAMETER_REQUIRED.getErrorCode(),
-                                "Required parameter '" + paramName + "' is missing for capability: " + capabilityId
+                                I18n.schemaValidatorText.requiredParameterMissing.replace("{0}", paramName).replace("{1}", capabilityId)
                         );
                     }
                 }
@@ -62,15 +91,15 @@ public class SchemaValidator {
                 }
             }
 
-            XLogger.debug("Parameters validated successfully for capability: " + capabilityId);
+            XLogger.debug(I18n.schemaValidatorText.parametersValidatedSuccessfully, capabilityId);
 
         } catch (McpValidationException ex) {
             throw ex;
         } catch (Exception ex) {
-            XLogger.error("Error during parameter validation for capability: " + capabilityId, ex);
+            XLogger.error(I18n.schemaValidatorText.errorDuringParameterValidation, capabilityId, ex);
             throw new McpValidationException(
                     ErrorCode.SCHEMA_VALIDATION_FAILED.getErrorCode(),
-                    "Error during parameter validation: " + ex.getMessage()
+                    I18n.schemaValidatorText.errorDuringParameterValidationDetail.replace("{0}", ex.getMessage())
             );
         }
     }
@@ -97,15 +126,15 @@ public class SchemaValidator {
                 validateType("return value", returnValue, expectedType);
             }
 
-            XLogger.debug("Return value validated successfully for capability: " + capabilityId);
+            XLogger.debug(I18n.schemaValidatorText.returnValueValidatedSuccessfully, capabilityId);
 
         } catch (McpValidationException ex) {
             throw ex;
         } catch (Exception ex) {
-            XLogger.error("Error during return value validation for capability: " + capabilityId, ex);
+            XLogger.error(I18n.schemaValidatorText.errorDuringReturnValueValidation, capabilityId, ex);
             throw new McpValidationException(
                     ErrorCode.SCHEMA_VALIDATION_FAILED.getErrorCode(),
-                    "Error during return value validation: " + ex.getMessage()
+                    I18n.schemaValidatorText.errorDuringReturnValueValidationDetail.replace("{0}", ex.getMessage())
             );
         }
     }
@@ -132,14 +161,14 @@ public class SchemaValidator {
             if (minimum != null && number.doubleValue() < minimum) {
                 throw new McpValidationException(
                         ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                        "Parameter '" + paramName + "' must be at least " + minimum
+                        I18n.schemaValidatorText.parameterMustBeAtLeast.replace("{0}", paramName).replace("{1}", minimum.toString())
                 );
             }
 
             if (maximum != null && number.doubleValue() > maximum) {
                 throw new McpValidationException(
                         ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                        "Parameter '" + paramName + "' must be at most " + maximum
+                        I18n.schemaValidatorText.parameterMustBeAtMost.replace("{0}", paramName).replace("{1}", maximum.toString())
                 );
             }
         }
@@ -153,11 +182,11 @@ public class SchemaValidator {
                     if (!((String) paramValue).matches(pattern)) {
                         throw new McpValidationException(
                                 ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                                "Parameter '" + paramName + "' does not match pattern: " + pattern
+                                I18n.schemaValidatorText.parameterDoesNotMatchPattern.replace("{0}", paramName).replace("{1}", pattern)
                         );
                     }
                 } catch (Exception ex) {
-                    XLogger.warn("Invalid regex pattern for parameter '" + paramName + "': " + pattern);
+                    XLogger.warn(I18n.schemaValidatorText.invalidRegexPattern.replace("{0}", paramName).replace("{1}", pattern));
                 }
             }
         }
@@ -176,7 +205,7 @@ public class SchemaValidator {
                 if (!(value instanceof String)) {
                     throw new McpValidationException(
                             ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                            name + " must be a string"
+                            I18n.schemaValidatorText.mustBeAString.replace("{0}", name)
                     );
                 }
                 break;
@@ -184,7 +213,7 @@ public class SchemaValidator {
                 if (!(value instanceof Number)) {
                     throw new McpValidationException(
                             ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                            name + " must be an integer"
+                            I18n.schemaValidatorText.mustBeAnInteger.replace("{0}", name)
                     );
                 }
                 break;
@@ -192,7 +221,7 @@ public class SchemaValidator {
                 if (!(value instanceof Number)) {
                     throw new McpValidationException(
                             ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                            name + " must be a number"
+                            I18n.schemaValidatorText.mustBeANumber.replace("{0}", name)
                     );
                 }
                 break;
@@ -200,7 +229,7 @@ public class SchemaValidator {
                 if (!(value instanceof Boolean)) {
                     throw new McpValidationException(
                             ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                            name + " must be a boolean"
+                            I18n.schemaValidatorText.mustBeABoolean.replace("{0}", name)
                     );
                 }
                 break;
@@ -208,7 +237,7 @@ public class SchemaValidator {
                 if (!(value instanceof List)) {
                     throw new McpValidationException(
                             ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                            name + " must be an array"
+                            I18n.schemaValidatorText.mustBeAnArray.replace("{0}", name)
                     );
                 }
                 break;
@@ -216,7 +245,7 @@ public class SchemaValidator {
                 if (!(value instanceof Map)) {
                     throw new McpValidationException(
                             ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                            name + " must be an object"
+                            I18n.schemaValidatorText.mustBeAnObject.replace("{0}", name)
                     );
                 }
                 break;
@@ -224,13 +253,13 @@ public class SchemaValidator {
                 if (value != null) {
                     throw new McpValidationException(
                             ErrorCode.PARAMETER_INVALID.getErrorCode(),
-                            name + " must be null"
+                            I18n.schemaValidatorText.mustBeNull.replace("{0}", name)
                     );
                 }
                 break;
             default:
                 // Unknown type, skip validation
-                XLogger.debug("Unknown type '" + expectedType + "' for " + name + ", skipping type validation");
+                XLogger.debug(I18n.schemaValidatorText.unknownType.replace("{0}", expectedType).replace("{1}", name));
         }
     }
 

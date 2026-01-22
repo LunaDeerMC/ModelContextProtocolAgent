@@ -3,7 +3,9 @@ package cn.lunadeer.mc.modelContextProtocolAgent.core.audit;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.CallerInfo;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.ExecutionContext;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.ExecutionInterceptor;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -24,6 +26,22 @@ import java.util.concurrent.LinkedBlockingQueue;
  * @since 1.0.0
  */
 public class AuditLogger implements ExecutionInterceptor {
+
+    /**
+     * Text definitions for AuditLogger.
+     */
+    public static class AuditLoggerText extends ConfigurationPart {
+        public String redacted = "***REDACTED***";
+        public String mapWithEntries = "Map with {0} entries";
+        public String listWithItems = "List with {0} items";
+        public String auditLogFormat = "[AUDIT] {0} | {1} | {2} | {3} | {4} | {5}";
+        public String success = "SUCCESS";
+        public String failed = "FAILED";
+        public String emptyString = "";
+        public String errorWritingAuditEvent = "Error writing audit event";
+    }
+
+    public static AuditLoggerText auditLoggerText = new AuditLoggerText();
 
     private static final int ORDER = 1000; // Late execution
     private final BlockingQueue<AuditEvent> eventQueue = new LinkedBlockingQueue<>();
@@ -124,7 +142,7 @@ public class AuditLogger implements ExecutionInterceptor {
 
             // Sanitize sensitive fields
             if (isSensitiveField(key)) {
-                sanitized.put(key, "***REDACTED***");
+                sanitized.put(key, I18n.auditLoggerText.redacted);
             } else {
                 sanitized.put(key, value);
             }
@@ -147,12 +165,12 @@ public class AuditLogger implements ExecutionInterceptor {
         if (response instanceof Map) {
             Map<?, ?> map = (Map<?, ?>) response;
             if (map.size() > 10) {
-                return "Map with " + map.size() + " entries";
+                return I18n.auditLoggerText.mapWithEntries.replace("{0}", String.valueOf(map.size()));
             }
         } else if (response instanceof List) {
             List<?> list = (List<?>) response;
             if (list.size() > 10) {
-                return "List with " + list.size() + " items";
+                return I18n.auditLoggerText.listWithItems.replace("{0}", String.valueOf(list.size()));
             }
         }
 
@@ -204,7 +222,7 @@ public class AuditLogger implements ExecutionInterceptor {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception ex) {
-                XLogger.error("Error writing audit event", ex);
+                XLogger.error(I18n.auditLoggerText.errorWritingAuditEvent, ex);
             }
         }
     }
@@ -218,13 +236,13 @@ public class AuditLogger implements ExecutionInterceptor {
         // TODO: Implement file-based audit logging
         // For now, just log to console
         String logEntry = String.format(
-                "[AUDIT] %s | %s | %s | %s | %s | %s",
+                I18n.auditLoggerText.auditLogFormat,
                 event.timestamp(),
                 event.eventType(),
                 event.capabilityId(),
                 event.caller() != null ? event.caller().getId() : "unknown",
-                event.success() ? "SUCCESS" : "FAILED",
-                event.error() != null ? event.error() : ""
+                event.success() ? I18n.auditLoggerText.success : I18n.auditLoggerText.failed,
+                event.error() != null ? event.error() : I18n.auditLoggerText.emptyString
         );
 
         if (event.success()) {

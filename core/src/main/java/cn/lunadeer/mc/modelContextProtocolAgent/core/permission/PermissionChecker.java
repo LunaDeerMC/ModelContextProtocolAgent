@@ -4,7 +4,9 @@ import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.CallerInfo;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.ExecutionContext;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.ExecutionInterceptor;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.registry.CapabilityDescriptor;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.exception.McpSecurityException;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.ErrorCode;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.RiskLevel;
@@ -24,6 +26,21 @@ import java.util.Set;
  */
 public class PermissionChecker implements ExecutionInterceptor {
 
+    /**
+     * Text definitions for PermissionChecker.
+     */
+    public static class PermissionCheckerText extends ConfigurationPart {
+        public String noCapabilitySpecified = "No capability specified";
+        public String noCallerInformationAvailable = "No caller information available";
+        public String permissionDeniedForCapability = "Permission denied for capability: {0}. Required: {1}, Caller has: {2}";
+        public String insufficientPermissionsToExecuteCapability = "Insufficient permissions to execute capability: {0}";
+        public String roleCheckFailedForCapability = "Role check failed for capability: {0}. Required role: {1}, Caller roles: {2}";
+        public String insufficientRoleToExecuteCapability = "Insufficient role to execute capability: {0}. Required role: {1}";
+        public String permissionCheckPassedForCapability = "Permission check passed for capability: {0}";
+    }
+
+    public static PermissionCheckerText permissionCheckerText = new PermissionCheckerText();
+
     private static final int ORDER = 100; // Early execution
 
     /**
@@ -41,14 +58,14 @@ public class PermissionChecker implements ExecutionInterceptor {
         if (capability == null) {
             throw new McpSecurityException(
                     ErrorCode.PERMISSION_DENIED.getErrorCode(),
-                    "No capability specified"
+                    I18n.permissionCheckerText.noCapabilitySpecified
             );
         }
 
         if (caller == null) {
             throw new McpSecurityException(
                     ErrorCode.PERMISSION_DENIED.getErrorCode(),
-                    "No caller information available"
+                    I18n.permissionCheckerText.noCallerInformationAvailable
             );
         }
 
@@ -56,13 +73,14 @@ public class PermissionChecker implements ExecutionInterceptor {
         Set<String> requiredPermissions = new HashSet<>(capability.getPermissions());
         if (!requiredPermissions.isEmpty()) {
             if (!caller.hasAllPermissions(requiredPermissions)) {
-                XLogger.debug("Permission denied for capability: " + capability.getId() +
-                        ". Required: " + requiredPermissions +
-                        ", Caller has: " + caller.getPermissions());
+                XLogger.debug(I18n.permissionCheckerText.permissionDeniedForCapability
+                        .replace("{0}", capability.getId())
+                        .replace("{1}", requiredPermissions.toString())
+                        .replace("{2}", caller.getPermissions().toString()));
 
                 throw new McpSecurityException(
                         ErrorCode.PERMISSION_DENIED.getErrorCode(),
-                        "Insufficient permissions to execute capability: " + capability.getId()
+                        I18n.permissionCheckerText.insufficientPermissionsToExecuteCapability.replace("{0}", capability.getId())
                 );
             }
         }
@@ -72,19 +90,21 @@ public class PermissionChecker implements ExecutionInterceptor {
         if (riskLevel != null) {
             String requiredRole = getRequiredRoleForRiskLevel(riskLevel);
             if (requiredRole != null && !caller.hasRole(requiredRole)) {
-                XLogger.debug("Role check failed for capability: " + capability.getId() +
-                        ". Required role: " + requiredRole +
-                        ", Caller roles: " + caller.getRoles());
+                XLogger.debug(I18n.permissionCheckerText.roleCheckFailedForCapability
+                        .replace("{0}", capability.getId())
+                        .replace("{1}", requiredRole)
+                        .replace("{2}", caller.getRoles().toString()));
 
                 throw new McpSecurityException(
                         ErrorCode.PERMISSION_DENIED.getErrorCode(),
-                        "Insufficient role to execute capability: " + capability.getId() +
-                        ". Required role: " + requiredRole
+                        I18n.permissionCheckerText.insufficientRoleToExecuteCapability
+                                .replace("{0}", capability.getId())
+                                .replace("{1}", requiredRole)
                 );
             }
         }
 
-        XLogger.debug("Permission check passed for capability: " + capability.getId());
+        XLogger.debug(I18n.permissionCheckerText.permissionCheckPassedForCapability, capability.getId());
         return true;
     }
 

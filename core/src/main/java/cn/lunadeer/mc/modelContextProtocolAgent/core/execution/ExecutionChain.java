@@ -1,6 +1,8 @@
 package cn.lunadeer.mc.modelContextProtocolAgent.core.execution;
 
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -15,6 +17,16 @@ import java.util.concurrent.CompletableFuture;
  * @since 1.0.0
  */
 public class ExecutionChain {
+
+    /**
+     * Text definitions for ExecutionChain.
+     */
+    public static class ExecutionChainText extends ConfigurationPart {
+        public String executionSkippedByInterceptor = "Execution skipped by interceptor: {0}";
+        public String errorInInterceptorOnError = "Error in interceptor onError: {0}";
+    }
+
+    public static ExecutionChainText executionChainText = new ExecutionChainText();
 
     private final List<ExecutionInterceptor> interceptors;
     private final Runnable target;
@@ -49,7 +61,7 @@ public class ExecutionChain {
                     if (!shouldContinue) {
                         // Interceptor requested to skip execution
                         context.setSkipped(true);
-                        XLogger.debug("Execution skipped by interceptor: " + interceptor.getClass().getSimpleName());
+                        XLogger.debug(I18n.executionChainText.executionSkippedByInterceptor, interceptor.getClass().getSimpleName());
                         return;
                     }
                 }
@@ -71,7 +83,7 @@ public class ExecutionChain {
                         ExecutionInterceptor interceptor = interceptors.get(i);
                         interceptor.onError(context, ex);
                     } catch (Throwable onErrorEx) {
-                        XLogger.error("Error in interceptor onError: " + onErrorEx.getMessage());
+                        XLogger.error(I18n.executionChainText.errorInInterceptorOnError, onErrorEx.getMessage());
                         XLogger.error(onErrorEx);
                     }
                 }

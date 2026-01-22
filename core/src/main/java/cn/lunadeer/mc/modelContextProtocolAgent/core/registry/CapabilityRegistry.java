@@ -1,6 +1,8 @@
 package cn.lunadeer.mc.modelContextProtocolAgent.core.registry;
 
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.annotations.McpAction;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.annotations.McpContext;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.annotations.McpEvent;
@@ -28,6 +30,23 @@ import java.util.stream.Collectors;
  * @since 1.0.0
  */
 public class CapabilityRegistry implements McpProviderRegistry {
+
+    /**
+     * Text definitions for CapabilityRegistry.
+     */
+    public static class CapabilityRegistryText extends ConfigurationPart {
+        public String providerInstanceCannotBeNull = "Provider instance cannot be null";
+        public String providerClassMustBeAnnotated = "Provider class {0} must be annotated with @McpProvider";
+        public String providerWithIdIsAlreadyRegistered = "Provider with ID '{0}' is already registered";
+        public String noCapabilitiesFoundInProvider = "No capabilities found in provider: {0}";
+        public String registeredProvider = "Registered provider: {0} ({1} capabilities)";
+        public String attemptedToUnregisterUnknownProviderInstance = "Attempted to unregister unknown provider instance";
+        public String unregisteredProvidersForPlugin = "Unregistered {0} providers for plugin: {1}";
+        public String unregisteredProvider = "Unregistered provider: {0}";
+        public String unknownAnnotationType = "Unknown annotation type: {0}";
+    }
+
+    public static CapabilityRegistryText capabilityRegistryText = new CapabilityRegistryText();
 
     /**
      * Capability index: capabilityId -> CapabilityDescriptor.
@@ -58,7 +77,7 @@ public class CapabilityRegistry implements McpProviderRegistry {
     @Override
     public void register(Object providerInstance, Plugin ownerPlugin) {
         if (providerInstance == null) {
-            throw new IllegalArgumentException("Provider instance cannot be null");
+            throw new IllegalArgumentException(I18n.capabilityRegistryText.providerInstanceCannotBeNull);
         }
 
         Class<?> providerClass = providerInstance.getClass();
@@ -66,7 +85,7 @@ public class CapabilityRegistry implements McpProviderRegistry {
 
         if (providerAnnotation == null) {
             throw new IllegalArgumentException(
-                    "Provider class " + providerClass.getName() + " must be annotated with @McpProvider");
+                    I18n.capabilityRegistryText.providerClassMustBeAnnotated.replace("{0}", providerClass.getName()));
         }
 
         String providerId = providerAnnotation.id();
@@ -75,14 +94,14 @@ public class CapabilityRegistry implements McpProviderRegistry {
 
         // Check if provider is already registered
         if (providerIndex.containsKey(providerId)) {
-            throw new IllegalArgumentException("Provider with ID '" + providerId + "' is already registered");
+            throw new IllegalArgumentException(I18n.capabilityRegistryText.providerWithIdIsAlreadyRegistered.replace("{0}", providerId));
         }
 
         // Scan for capabilities
         List<CapabilityDescriptor> capabilities = scanCapabilities(providerInstance, providerId);
 
         if (capabilities.isEmpty()) {
-            XLogger.warn("No capabilities found in provider: " + providerId);
+            XLogger.warn(I18n.capabilityRegistryText.noCapabilitiesFoundInProvider, providerId);
         }
 
         // Create provider descriptor
@@ -103,7 +122,7 @@ public class CapabilityRegistry implements McpProviderRegistry {
             capabilityIndex.put(capability.getId(), capability);
         }
 
-        XLogger.info("Registered provider: " + providerId + " (" + capabilities.size() + " capabilities)");
+        XLogger.info(I18n.capabilityRegistryText.registeredProvider, providerId, capabilities.size());
     }
 
     @Override
@@ -114,7 +133,7 @@ public class CapabilityRegistry implements McpProviderRegistry {
 
         String providerId = providerInstanceToId.get(providerInstance);
         if (providerId == null) {
-            XLogger.warn("Attempted to unregister unknown provider instance");
+            XLogger.warn(I18n.capabilityRegistryText.attemptedToUnregisterUnknownProviderInstance);
             return;
         }
 
@@ -139,7 +158,7 @@ public class CapabilityRegistry implements McpProviderRegistry {
         }
 
         if (!providerIds.isEmpty()) {
-            XLogger.info("Unregistered " + providerIds.size() + " providers for plugin: " + ownerPlugin.getName());
+            XLogger.info(I18n.capabilityRegistryText.unregisteredProvidersForPlugin, providerIds.size(), ownerPlugin.getName());
         }
     }
 
@@ -296,7 +315,7 @@ public class CapabilityRegistry implements McpProviderRegistry {
             cacheable = false; // Events are not cacheable
             cacheTtl = 0;
         } else {
-            throw new IllegalArgumentException("Unknown annotation type: " + annotation.getClass().getName());
+            throw new IllegalArgumentException(I18n.capabilityRegistryText.unknownAnnotationType.replace("{0}", annotation.getClass().getName()));
         }
 
         // Generate schemas
@@ -361,6 +380,6 @@ public class CapabilityRegistry implements McpProviderRegistry {
         // Remove provider instance mapping
         providerInstanceToId.remove(provider.getInstance());
 
-        XLogger.info("Unregistered provider: " + providerId);
+        XLogger.info(I18n.capabilityRegistryText.unregisteredProvider, providerId);
     }
 }

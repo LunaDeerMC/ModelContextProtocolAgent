@@ -4,7 +4,9 @@ import cn.lunadeer.mc.modelContextProtocolAgent.communication.message.McpRequest
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.message.McpResponse;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.registry.CapabilityDescriptor;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.registry.CapabilityRegistry;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.exception.McpBusinessException;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.exception.McpException;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.ErrorCode;
@@ -24,6 +26,20 @@ import java.util.concurrent.CompletableFuture;
  * @since 1.0.0
  */
 public class ExecutionEngine {
+
+    /**
+     * Text definitions for ExecutionEngine.
+     */
+    public static class ExecutionEngineText extends ConfigurationPart {
+        public String capabilityNotFound = "Capability not found: {0}";
+        public String unexpectedErrorDuringCapabilityExecution = "Unexpected error during capability execution";
+        public String internalErrorDuringExecution = "Internal error during execution";
+        public String capabilityExecuted = "Capability executed: {0}";
+        public String failedToExecuteCapability = "Failed to execute capability: {0}";
+        public String invalidEnumValue = "Invalid enum value '{0}' for type {1}. Valid values: {2}";
+    }
+
+    public static ExecutionEngineText executionEngineText = new ExecutionEngineText();
 
     private final CapabilityRegistry registry;
     private final List<ExecutionInterceptor> interceptors;
@@ -57,7 +73,7 @@ public class ExecutionEngine {
                     return McpResponse.error(
                             request.getId(),
                             ErrorCode.CAPABILITY_NOT_FOUND,
-                            "Capability not found: " + request.getCapabilityId()
+                            I18n.executionEngineText.capabilityNotFound.replace("{0}", request.getCapabilityId())
                     ).build();
                 }
 
@@ -82,11 +98,11 @@ public class ExecutionEngine {
                 }
                 return McpResponse.error(request.getId(), errorCode, ex.getMessage()).build();
             } catch (Exception ex) {
-                XLogger.error("Unexpected error during capability execution", ex);
+                XLogger.error(I18n.executionEngineText.unexpectedErrorDuringCapabilityExecution, ex);
                 return McpResponse.error(
                         request.getId(),
                         ErrorCode.INTERNAL_ERROR,
-                        "Internal error during execution"
+                        I18n.executionEngineText.internalErrorDuringExecution
                 ).build();
             }
         });
@@ -133,7 +149,7 @@ public class ExecutionEngine {
             // Set the result in context
             context.setResult(result);
 
-            XLogger.debug("Capability executed: " + capability.getId());
+            XLogger.debug(I18n.executionEngineText.capabilityExecuted, capability.getId());
 
         } catch (Exception ex) {
             // Unwrap reflection exceptions
@@ -145,7 +161,7 @@ public class ExecutionEngine {
 
             throw new McpBusinessException(
                     ErrorCode.OPERATION_FAILED.getErrorCode(),
-                    "Failed to execute capability: " + capability.getId(),
+                    I18n.executionEngineText.failedToExecuteCapability.replace("{0}", capability.getId()),
                     cause
             );
         }
@@ -232,8 +248,10 @@ public class ExecutionEngine {
             return Enum.valueOf((Class<Enum>) enumType, enumName);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
-                    "Invalid enum value '" + value + "' for type " + enumType.getSimpleName() +
-                    ". Valid values: " + getEnumValues(enumType)
+                    I18n.executionEngineText.invalidEnumValue
+                            .replace("{0}", value.toString())
+                            .replace("{1}", enumType.getSimpleName())
+                            .replace("{2}", getEnumValues(enumType))
             );
         }
     }
