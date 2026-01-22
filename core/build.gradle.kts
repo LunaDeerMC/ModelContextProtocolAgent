@@ -22,5 +22,6 @@ repositories {
 dependencies {
     implementation(project(":sdk"))
     compileOnly("io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT")
+    implementation("org.java-websocket:Java-WebSocket:1.5.4")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
 }

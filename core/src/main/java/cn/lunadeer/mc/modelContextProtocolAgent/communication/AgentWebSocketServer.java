@@ -13,22 +13,16 @@ import cn.lunadeer.mc.modelContextProtocolAgent.communication.session.WebSocketC
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
-import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.scheduler.Scheduler;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
+import org.java_websocket.WebSocket;
+import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.WebSocketServer;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * WebSocket server for MCP Agent.
+ * WebSocket server for MCP Agent using Java-WebSocket library.
  * Handles incoming connections from Gateway.
  *
  * @author ZhangYuheng
@@ -42,6 +36,8 @@ public class AgentWebSocketServer {
         public String wsBroadcastFailed = "Failed to broadcast to gateway {0}: {1}";
         public String wsConnectionError = "Error handling connection from gateway {0}: {1}";
         public String wsMessageHandlingError = "Failed to handle message from gateway {0}: {1}";
+        public String wsClientConnected = "Client connected from {0}";
+        public String wsClientDisconnected = "Client disconnected: {0}, reason: {1}";
     }
 
     private final String host;
@@ -50,7 +46,7 @@ public class AgentWebSocketServer {
     private final MessageCodec messageCodec;
     private final MessageRouter messageRouter;
     private final HeartbeatHandler heartbeatHandler;
-    private HttpServer httpServer;
+    private WebSocketServerImpl webSocketServer;
     private boolean running = false;
 
     public AgentWebSocketServer(String host, int port) {
@@ -81,17 +77,16 @@ public class AgentWebSocketServer {
     public CompletableFuture<Void> start() {
         return CompletableFuture.runAsync(() -> {
             try {
-                httpServer = HttpServer.create(new InetSocketAddress(host, port), 0);
-                httpServer.createContext("/ws", new WebSocketUpgradeHandler());
-                httpServer.setExecutor(null); // Use default executor
-                httpServer.start();
+                InetSocketAddress address = new InetSocketAddress(host, port);
+                webSocketServer = new WebSocketServerImpl(address);
+                webSocketServer.start();
                 running = true;
 
                 // Start heartbeat handler
                 heartbeatHandler.start();
 
                 XLogger.info(I18n.agentWebSocketServerText.wsServerStarted, host, port);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 XLogger.error(I18n.agentWebSocketServerText.wsServerFailed, e.getMessage());
                 throw new RuntimeException("WebSocket server startup failed", e);
             }
@@ -102,10 +97,15 @@ public class AgentWebSocketServer {
      * Stops the WebSocket server.
      */
     public void stop() {
-        if (httpServer != null) {
+        if (webSocketServer != null) {
             running = false;
             sessionManager.closeAllSessions("Server shutdown");
-            httpServer.stop(5);
+            try {
+                webSocketServer.stop();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                XLogger.error("Error stopping WebSocket server: {0}", e.getMessage());
+            }
             sessionManager.shutdown();
             XLogger.info("MCP Agent WebSocket server stopped");
         }
@@ -182,149 +182,113 @@ public class AgentWebSocketServer {
     }
 
     /**
-     * Handles an incoming WebSocket connection.
+     * WebSocket server implementation using Java-WebSocket library.
      */
-    private class WebSocketUpgradeHandler implements HttpHandler {
+    private class WebSocketServerImpl extends WebSocketServer {
+
+        public WebSocketServerImpl(InetSocketAddress address) {
+            super(address);
+        }
+
         @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            String upgradeHeader = exchange.getRequestHeaders().getFirst("Upgrade");
-            if (upgradeHeader == null || !upgradeHeader.equalsIgnoreCase("websocket")) {
-                exchange.sendResponseHeaders(400, -1);
-                return;
-            }
-
-            // Get Sec-WebSocket-Key from client
-            String clientKey = exchange.getRequestHeaders().getFirst("Sec-WebSocket-Key");
-            if (clientKey == null) {
-                exchange.sendResponseHeaders(400, -1);
-                return;
-            }
-
-            // Generate Sec-WebSocket-Accept
-            String acceptKey = generateWebSocketAcceptKey(clientKey);
-
-            // Generate session ID
+        public void onOpen(WebSocket webSocket, ClientHandshake handshake) {
             String sessionId = UUID.randomUUID().toString();
+            XLogger.debug(I18n.agentWebSocketServerText.wsClientConnected,
+                    webSocket.getRemoteSocketAddress());
 
             // Create WebSocket connection wrapper
-            WebSocketConnectionImpl connection = new WebSocketConnectionImpl(exchange, sessionId);
+            WebSocketConnectionImpl connection = new WebSocketConnectionImpl(webSocket);
 
             // Create gateway session
             GatewaySession session = new GatewaySession(sessionId, connection);
             sessionManager.addSession(session);
 
-            // Send 101 Switching Protocols with proper WebSocket headers
-            exchange.getResponseHeaders().add("Connection", "Upgrade");
-            exchange.getResponseHeaders().add("Upgrade", "websocket");
-            exchange.getResponseHeaders().add("Sec-WebSocket-Accept", acceptKey);
-            exchange.sendResponseHeaders(101, -1);
+            // Store session ID in the WebSocket object for later retrieval
+            webSocket.setAttachment(sessionId);
+        }
 
-            // Start handling messages in background
-            Scheduler.runTaskAsync(() -> handleConnection(session, connection));
+        @Override
+        public void onClose(WebSocket webSocket, int code, String reason, boolean remote) {
+            String sessionId = (String) webSocket.getAttachment();
+            XLogger.debug(I18n.agentWebSocketServerText.wsClientDisconnected,
+                    webSocket.getRemoteSocketAddress(), reason);
+
+            if (sessionId != null) {
+                sessionManager.removeSession(sessionId);
+            }
+        }
+
+        @Override
+        public void onMessage(WebSocket webSocket, String message) {
+            String sessionId = (String) webSocket.getAttachment();
+            if (sessionId == null) {
+                return;
+            }
+
+            GatewaySession session = sessionManager.getSession(sessionId);
+            if (session == null) {
+                return;
+            }
+
+            handleMessage(session, message);
+        }
+
+        @Override
+        public void onError(WebSocket webSocket, Exception ex) {
+            XLogger.error(I18n.agentWebSocketServerText.wsConnectionError,
+                    webSocket != null ? webSocket.getRemoteSocketAddress() : "unknown", ex.getMessage());
+        }
+
+        @Override
+        public void onStart() {
+            XLogger.info("WebSocket server started successfully");
         }
 
         /**
-         * Generates the Sec-WebSocket-Accept key from the client's Sec-WebSocket-Key.
-         * This follows the WebSocket handshake specification (RFC 6455).
+         * Handles an incoming message.
          */
-        private String generateWebSocketAcceptKey(String clientKey) {
+        private void handleMessage(GatewaySession session, String json) {
             try {
-                String guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-                String combined = clientKey + guid;
+                McpMessage message = messageCodec.decode(json);
+                message.setSessionId(session.getId());
+                message.setGatewayId(session.getGatewayId());
 
-                MessageDigest digest = MessageDigest.getInstance("SHA-1");
-                byte[] hash = digest.digest(combined.getBytes(StandardCharsets.UTF_8));
+                // Update last activity time
+                session.setLastActivityAt(java.time.Instant.now());
 
-                return Base64.getEncoder().encodeToString(hash);
+                // Route message to appropriate handler via MessageRouter
+                messageRouter.route(session, message);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to generate WebSocket accept key", e);
+                XLogger.error(I18n.agentWebSocketServerText.wsMessageHandlingError,
+                        session.getGatewayId(), e.getMessage());
             }
         }
     }
 
     /**
-     * Handles a WebSocket connection.
-     */
-    private void handleConnection(GatewaySession session, WebSocketConnectionImpl connection) {
-        try {
-            // Read messages from the connection
-            while (running && connection.isOpen()) {
-                String message = connection.receive();
-                if (message == null) {
-                    break;
-                }
-
-                handleMessage(session, message);
-            }
-        } catch (Exception e) {
-            XLogger.error(I18n.agentWebSocketServerText.wsConnectionError,
-                    session.getGatewayId(), e.getMessage());
-        } finally {
-            sessionManager.removeSession(session.getId());
-        }
-    }
-
-    /**
-     * Handles an incoming message.
-     */
-    private void handleMessage(GatewaySession session, String json) {
-        try {
-            McpMessage message = messageCodec.decode(json);
-            message.setSessionId(session.getId());
-            message.setGatewayId(session.getGatewayId());
-
-            // Update last activity time
-            session.setLastActivityAt(java.time.Instant.now());
-
-            // Route message to appropriate handler via MessageRouter
-            messageRouter.route(session, message);
-        } catch (Exception e) {
-            XLogger.error(I18n.agentWebSocketServerText.wsMessageHandlingError,
-                    session.getGatewayId(), e.getMessage());
-        }
-    }
-
-    /**
-     * WebSocket connection implementation using HttpExchange.
+     * WebSocket connection implementation using Java-WebSocket.
      */
     private static class WebSocketConnectionImpl implements WebSocketConnection {
-        private final HttpExchange exchange;
-        private volatile boolean open = true;
+        private final WebSocket webSocket;
 
-        public WebSocketConnectionImpl(HttpExchange exchange, String sessionId) {
-            this.exchange = exchange;
+        public WebSocketConnectionImpl(WebSocket webSocket) {
+            this.webSocket = webSocket;
         }
 
         @Override
         public CompletableFuture<Void> send(String message) {
             return CompletableFuture.runAsync(() -> {
-                try {
-                    OutputStream os = exchange.getResponseBody();
-                    // Note: This is a simplified implementation
-                    // In production, you'd use a proper WebSocket library
-                    byte[] bytes = message.getBytes();
-                    os.write(bytes);
-                    os.flush();
-                } catch (IOException e) {
-                    throw new RuntimeException("Failed to send message", e);
+                if (webSocket.isOpen()) {
+                    webSocket.send(message);
+                } else {
+                    throw new RuntimeException("WebSocket is not open");
                 }
             });
         }
 
         @Override
         public void close(int statusCode, String reason) {
-            open = false;
-            exchange.close();
-        }
-
-        public boolean isOpen() {
-            return open;
-        }
-
-        public String receive() throws IOException {
-            // This is a placeholder - proper WebSocket implementation would read from the input stream
-            // For now, return null to indicate no message
-            return null;
+            webSocket.close(statusCode, reason);
         }
     }
 }
