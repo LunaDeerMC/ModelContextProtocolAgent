@@ -20,8 +20,8 @@ import org.bukkit.entity.Player;
  * @since 1.0.0
  */
 @McpProvider(
-    id = "mcp-agent-internal",
-    name = "MCP Core Agent",
+    id = "mcp-internal-chat",
+    name = "MCP Chat Provider",
     version = "1.0.0",
     description = "Built-in capabilities for Minecraft chat management"
 )

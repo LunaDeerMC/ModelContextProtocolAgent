@@ -20,8 +20,8 @@ import java.util.List;
  * @since 1.0.0
  */
 @McpProvider(
-    id = "mcp-agent-internal",
-    name = "MCP Core Agent",
+    id = "mcp-internal-system",
+    name = "MCP System Provider",
     version = "1.0.0",
     description = "Built-in capabilities for Minecraft system management"
 )

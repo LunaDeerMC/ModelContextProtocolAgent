@@ -28,8 +28,8 @@ import java.util.List;
  * @since 1.0.0
  */
 @McpProvider(
-    id = "mcp-agent-internal",
-    name = "MCP Core Agent",
+    id = "mcp-internal-player",
+    name = "MCP Player Provider",
     version = "1.0.0",
     description = "Built-in capabilities for Minecraft player management"
 )
