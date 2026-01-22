@@ -153,6 +153,7 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
             capabilityRegistry.register(new EntityProvider(), this);
             capabilityRegistry.register(new SystemProvider(), this);
             capabilityRegistry.register(new ChatProvider(), this);
+            capabilityRegistry.register(new BlockProvider(), this);
 
             int totalCapabilities = capabilityRegistry.getCapabilities().size();
             XLogger.info("Registered " + totalCapabilities + " built-in capabilities");
