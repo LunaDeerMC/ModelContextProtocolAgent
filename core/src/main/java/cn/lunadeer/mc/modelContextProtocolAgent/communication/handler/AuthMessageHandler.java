@@ -1,6 +1,7 @@
 package cn.lunadeer.mc.modelContextProtocolAgent.communication.handler;
 
 import cn.lunadeer.mc.modelContextProtocolAgent.Configuration;
+import cn.lunadeer.mc.modelContextProtocolAgent.ModelContextProtocolAgent;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.auth.AuthHandler;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.auth.AuthResult;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.codec.MessageCodec;
@@ -14,7 +15,6 @@ import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.CapabilityManifest;
 import org.bukkit.Bukkit;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -109,10 +109,17 @@ public class AuthMessageHandler implements MessageHandler {
 
     /**
      * Gets the capability manifest for the agent.
-     * In a real implementation, this would come from the capability registry.
+     * Retrieves all registered capabilities from the capability registry.
      */
     private List<CapabilityManifest> getCapabilityManifest() {
-        // Return empty list for now - this would be populated from the registry
-        return Collections.emptyList();
+        try {
+            ModelContextProtocolAgent plugin = ModelContextProtocolAgent.getInstance();
+            if (plugin != null && plugin.getCapabilityRegistry() != null) {
+                return plugin.getCapabilityRegistry().getCapabilities();
+            }
+        } catch (Exception e) {
+            XLogger.error("Failed to retrieve capability manifest: {0}", e.getMessage());
+        }
+        return List.of();
     }
 }
