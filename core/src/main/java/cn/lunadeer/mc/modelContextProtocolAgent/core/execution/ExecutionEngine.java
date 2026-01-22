@@ -208,8 +208,50 @@ public class ExecutionEngine {
             return value.toString();
         }
 
+        // Handle enum types
+        if (targetType.isEnum()) {
+            return convertToEnum(value, targetType);
+        }
+
         // Return as-is for complex types (will be handled by Jackson/Gson)
         return value;
+    }
+
+    /**
+     * Converts a value to an enum constant.
+     *
+     * @param value the value to convert
+     * @param enumType the enum type
+     * @return the enum constant
+     */
+    @SuppressWarnings("unchecked")
+    private Object convertToEnum(Object value, Class<?> enumType) {
+        try {
+            // Convert the value to string and look up the enum constant
+            String enumName = value.toString().toUpperCase();
+            return Enum.valueOf((Class<Enum>) enumType, enumName);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "Invalid enum value '" + value + "' for type " + enumType.getSimpleName() +
+                    ". Valid values: " + getEnumValues(enumType)
+            );
+        }
+    }
+
+    /**
+     * Gets all valid enum values as a string.
+     *
+     * @param enumType the enum type
+     * @return comma-separated list of enum values
+     */
+    private String getEnumValues(Class<?> enumType) {
+        Object[] constants = enumType.getEnumConstants();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < constants.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(constants[i].toString());
+        }
+        return sb.toString();
     }
 
     /**

@@ -22,4 +22,5 @@ repositories {
 dependencies {
     implementation(project(":sdk"))
     compileOnly("io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
 }
