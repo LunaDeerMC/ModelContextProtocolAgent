@@ -21,6 +21,9 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -190,6 +193,16 @@ public class AgentWebSocketServer {
                 return;
             }
 
+            // Get Sec-WebSocket-Key from client
+            String clientKey = exchange.getRequestHeaders().getFirst("Sec-WebSocket-Key");
+            if (clientKey == null) {
+                exchange.sendResponseHeaders(400, -1);
+                return;
+            }
+
+            // Generate Sec-WebSocket-Accept
+            String acceptKey = generateWebSocketAcceptKey(clientKey);
+
             // Generate session ID
             String sessionId = UUID.randomUUID().toString();
 
@@ -200,13 +213,32 @@ public class AgentWebSocketServer {
             GatewaySession session = new GatewaySession(sessionId, connection);
             sessionManager.addSession(session);
 
-            // Send 101 Switching Protocols
+            // Send 101 Switching Protocols with proper WebSocket headers
             exchange.getResponseHeaders().add("Connection", "Upgrade");
             exchange.getResponseHeaders().add("Upgrade", "websocket");
+            exchange.getResponseHeaders().add("Sec-WebSocket-Accept", acceptKey);
             exchange.sendResponseHeaders(101, -1);
 
             // Start handling messages in background
             Scheduler.runTaskAsync(() -> handleConnection(session, connection));
+        }
+
+        /**
+         * Generates the Sec-WebSocket-Accept key from the client's Sec-WebSocket-Key.
+         * This follows the WebSocket handshake specification (RFC 6455).
+         */
+        private String generateWebSocketAcceptKey(String clientKey) {
+            try {
+                String guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+                String combined = clientKey + guid;
+
+                MessageDigest digest = MessageDigest.getInstance("SHA-1");
+                byte[] hash = digest.digest(combined.getBytes(StandardCharsets.UTF_8));
+
+                return Base64.getEncoder().encodeToString(hash);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to generate WebSocket accept key", e);
+            }
         }
     }
 
