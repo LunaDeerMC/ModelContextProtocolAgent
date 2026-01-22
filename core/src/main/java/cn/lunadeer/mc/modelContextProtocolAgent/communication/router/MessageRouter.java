@@ -25,7 +25,7 @@ public class MessageRouter {
         public String routerHandlingHeartbeat = "Handling heartbeat: {0}";
         public String routerHandlingHeartbeatAck = "Handling heartbeat_ack: {0}";
         public String routerHandlingAuth = "Handling auth: {0}";
-        public String routerHandlingAuthResponse = "Handling auth_response: {0}";
+        public String routerHandlingRegisterAck = "Handling register_ack: {0}";
     }
 
     /**
@@ -59,8 +59,8 @@ public class MessageRouter {
                     case "auth":
                         handleAuth(message);
                         break;
-                    case "auth_response":
-                        handleAuthResponse(message);
+                    case "register_ack":
+                        handleRegisterAck(message);
                         break;
                     default:
                         XLogger.warn(I18n.messageRouterText.routerUnknownMessageType, type);
@@ -120,10 +120,10 @@ public class MessageRouter {
     }
 
     /**
-     * Handles an authentication response message.
+     * Handles a register acknowledgment message.
      */
-    private void handleAuthResponse(McpMessage message) {
-        XLogger.debug(I18n.messageRouterText.routerHandlingAuthResponse, message.getId());
-        // TODO: Handle auth response
+    private void handleRegisterAck(McpMessage message) {
+        XLogger.debug(I18n.messageRouterText.routerHandlingRegisterAck, message.getId());
+        // TODO: Handle register acknowledgment (Gateway side)
     }
 }

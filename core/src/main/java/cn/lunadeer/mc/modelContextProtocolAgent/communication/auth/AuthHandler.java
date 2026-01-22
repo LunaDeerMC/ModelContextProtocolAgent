@@ -36,14 +36,15 @@ public class AuthHandler {
             return AuthResult.failure("Invalid token");
         }
 
-        // 2. Check Gateway ID against whitelist (if enabled)
-        if (Configuration.websocketServer.maxConnections > 0) {
-            // Note: In a real implementation, we'd check against a configured whitelist
-            // For now, we accept any valid token
-            XLogger.debug(I18n.authHandlerText.gatewayPassedWhitelist, gatewayId);
-        }
+        // 2. Check if maximum connections reached
+        // Note: Connection limit check will be performed in SessionManager
+        // This is a placeholder for future implementation
 
-        // 3. Grant permissions based on configuration
+        // 3. Check Gateway ID against whitelist (if enabled)
+        // Note: In a real implementation, we'd check against a configured whitelist
+        XLogger.debug(I18n.authHandlerText.gatewayPassedWhitelist, gatewayId);
+
+        // 4. Grant permissions based on configuration
         Set<String> permissions = getGatewayPermissions(gatewayId);
 
         XLogger.info(I18n.authHandlerText.gatewayAuthenticated, gatewayId, permissions.size());

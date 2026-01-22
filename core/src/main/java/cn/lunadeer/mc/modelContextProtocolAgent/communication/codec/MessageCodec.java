@@ -169,7 +169,7 @@ public class MessageCodec {
 
     private HeartbeatMessage decodeHeartbeat(String id, JsonElement payload) {
         JsonObject obj = payload.getAsJsonObject();
-        String agentId = obj.get("agentId").getAsString();
+        String gatewayId = obj.get("gatewayId").getAsString();
         Instant timestamp = Instant.parse(obj.get("timestamp").getAsString());
 
         AgentStatus status = null;
@@ -186,7 +186,7 @@ public class MessageCodec {
 
         return HeartbeatMessage.builder()
                 .id(id)
-                .agentId(agentId)
+                .gatewayId(gatewayId)
                 .timestamp(timestamp)
                 .status(status)
                 .build();
@@ -194,12 +194,12 @@ public class MessageCodec {
 
     private HeartbeatAck decodeHeartbeatAck(String id, JsonElement payload) {
         JsonObject obj = payload.getAsJsonObject();
-        String agentId = obj.get("agentId").getAsString();
+        String gatewayId = obj.get("gatewayId").getAsString();
         Instant timestamp = Instant.parse(obj.get("timestamp").getAsString());
 
         return HeartbeatAck.builder()
                 .id(id)
-                .agentId(agentId)
+                .gatewayId(gatewayId)
                 .timestamp(timestamp)
                 .build();
     }

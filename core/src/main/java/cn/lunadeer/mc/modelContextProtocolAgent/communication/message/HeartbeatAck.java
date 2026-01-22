@@ -6,23 +6,24 @@ import com.google.gson.JsonObject;
 import java.time.Instant;
 
 /**
- * Heartbeat acknowledgment message.
+ * Heartbeat acknowledgment message (Gateway -> Agent).
+ * Gateway responds to Agent's heartbeat to confirm connection.
  *
  * @author ZhangYuheng
  * @since 1.0.0
  */
 public class HeartbeatAck extends McpMessage {
-    private final String agentId;
+    private final String gatewayId;
     private final Instant timestamp;
 
     private HeartbeatAck(Builder builder) {
         super(builder.id, "heartbeat_ack");
-        this.agentId = builder.agentId;
+        this.gatewayId = builder.gatewayId;
         this.timestamp = builder.timestamp;
     }
 
-    public String getAgentId() {
-        return agentId;
+    public String getGatewayId() {
+        return gatewayId;
     }
 
     public Instant getTimestamp() {
@@ -32,7 +33,7 @@ public class HeartbeatAck extends McpMessage {
     @Override
     public JsonElement getPayload() {
         JsonObject payload = new JsonObject();
-        payload.addProperty("agentId", agentId);
+        payload.addProperty("gatewayId", gatewayId);
         payload.addProperty("timestamp", timestamp.toString());
         return payload;
     }
@@ -43,7 +44,7 @@ public class HeartbeatAck extends McpMessage {
 
     public static class Builder {
         private String id;
-        private String agentId;
+        private String gatewayId;
         private Instant timestamp;
 
         public Builder id(String id) {
@@ -51,8 +52,8 @@ public class HeartbeatAck extends McpMessage {
             return this;
         }
 
-        public Builder agentId(String agentId) {
-            this.agentId = agentId;
+        public Builder gatewayId(String gatewayId) {
+            this.gatewayId = gatewayId;
             return this;
         }
 

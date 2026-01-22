@@ -1,5 +1,6 @@
 package cn.lunadeer.mc.modelContextProtocolAgent.communication.server;
 
+import cn.lunadeer.mc.modelContextProtocolAgent.Configuration;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.auth.AuthHandler;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.auth.AuthResult;
 import cn.lunadeer.mc.modelContextProtocolAgent.communication.codec.MessageCodec;
@@ -16,6 +17,7 @@ import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.CapabilityManifest;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import org.bukkit.Bukkit;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -45,6 +47,7 @@ public class AgentWebSocketServer {
         public String wsUnauthRequestAttempt = "Unauthenticated gateway {0} attempted request";
         public String wsUnknownMessageType = "Unknown message type from gateway {0}: {1}";
     }
+
     private final String host;
     private final int port;
     private final SessionManager sessionManager;
@@ -105,7 +108,7 @@ public class AgentWebSocketServer {
      * Sends a message to a specific session.
      *
      * @param sessionId the session ID
-     * @param message the message to send
+     * @param message   the message to send
      * @return a CompletableFuture that completes when the message is sent
      */
     public CompletableFuture<Void> send(String sessionId, McpMessage message) {
@@ -259,7 +262,7 @@ public class AgentWebSocketServer {
     }
 
     /**
-     * Handles an authentication request.
+     * Handles an authentication request (Gateway registration).
      */
     private void handleAuth(GatewaySession session, AuthRequest request) {
         if (session.isAuthenticated()) {
@@ -273,12 +276,31 @@ public class AgentWebSocketServer {
             session.setPermissions(result.getPermissions());
             sessionManager.markAuthenticated(session);
 
-            // Send authentication success response with capabilities
+            // Send registration acknowledgment with agent info and capabilities
             AuthResponse response = AuthResponse.builder()
                     .id(UUID.randomUUID().toString())
                     .success(true)
+                    .gatewayId(request.getGatewayId())
+                    .sessionId(session.getId())
+                    .agentInfo(new AuthResponse.AgentInfo(
+                            Configuration.agentInfo.agentId,
+                            Configuration.agentInfo.agentName,
+                            Configuration.agentInfo.agentVersion,
+                            Configuration.agentInfo.environment,
+                            new AuthResponse.ServerInfo(
+                                    Bukkit.getServer().getName(),
+                                    Bukkit.getServer().getWorldType(),
+                                    Bukkit.getServer().getVersion(),
+                                    Bukkit.getServer().getMaxPlayers()
+                            )
+                    ))
                     .permissions(result.getPermissions())
                     .capabilities(getCapabilityManifest())
+                    .config(new AuthResponse.Config(
+                            Configuration.websocketServer.heartbeatInterval,
+                            Configuration.websocketServer.reconnectDelay,
+                            Configuration.websocketServer.maxRetries
+                    ))
                     .build();
 
             send(session.getId(), response);
@@ -287,6 +309,7 @@ public class AgentWebSocketServer {
             AuthResponse response = AuthResponse.builder()
                     .id(UUID.randomUUID().toString())
                     .success(false)
+                    .gatewayId(request.getGatewayId())
                     .reason(result.getReason())
                     .build();
 

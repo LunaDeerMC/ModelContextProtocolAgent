@@ -28,6 +28,7 @@ public class GatewaySession {
     private volatile Set<String> permissions;
     private volatile Instant lastActivityAt;
     private volatile Instant lastHeartbeatAt;
+    private volatile int failedHeartbeatCount = 0;
 
     public GatewaySession(String id, WebSocketConnection connection) {
         this.id = id;
@@ -82,6 +83,18 @@ public class GatewaySession {
 
     public void setLastHeartbeatAt(Instant lastHeartbeatAt) {
         this.lastHeartbeatAt = lastHeartbeatAt;
+    }
+
+    public int getFailedHeartbeatCount() {
+        return failedHeartbeatCount;
+    }
+
+    public void setFailedHeartbeatCount(int failedHeartbeatCount) {
+        this.failedHeartbeatCount = failedHeartbeatCount;
+    }
+
+    public void incrementFailedHeartbeatCount() {
+        this.failedHeartbeatCount++;
     }
 
     /**

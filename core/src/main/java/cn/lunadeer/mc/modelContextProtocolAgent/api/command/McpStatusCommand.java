@@ -39,7 +39,7 @@ public class McpStatusCommand extends McpCommand {
 
         sendMessage(sender, "§6=== MCP Agent Status ===");
         sendMessage(sender, "§7Version: §f" + plugin.getDescription().getVersion());
-        sendMessage(sender, "§7Agent ID: §f" + Configuration.agentId);
+        sendMessage(sender, "§7Agent ID: §f" + Configuration.agentInfo.agentId);
 
         // WebSocket Server Status
         if (server != null) {

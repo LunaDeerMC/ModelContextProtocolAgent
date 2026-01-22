@@ -30,15 +30,20 @@ public class HeartbeatHandler {
         public String heartbeatSendFailed = "Failed to send heartbeat to gateway {0}: {1}";
         public String heartbeatSendError = "Error sending heartbeat to gateway {0}: {1}";
         public String heartbeatAckReceived = "Received heartbeat ack from gateway {0}";
+        public String heartbeatRetryExceeded = "Gateway {0} exceeded max retries ({1}), closing connection";
     }
     private final SessionManager sessionManager;
     private final long intervalMs;
     private final long timeoutMs;
+    private final long reconnectDelayMs;
+    private final int maxRetries;
 
     public HeartbeatHandler(SessionManager sessionManager) {
         this.sessionManager = sessionManager;
         this.intervalMs = Configuration.websocketServer.heartbeatInterval;
         this.timeoutMs = Configuration.websocketServer.heartbeatTimeout;
+        this.reconnectDelayMs = Configuration.websocketServer.reconnectDelay;
+        this.maxRetries = Configuration.websocketServer.maxRetries;
     }
 
     /**
@@ -67,11 +72,19 @@ public class HeartbeatHandler {
                     ).toMillis();
 
                     if (elapsedMs > timeoutMs) {
+                        session.incrementFailedHeartbeatCount();
+                        int failedCount = session.getFailedHeartbeatCount();
+
+                        if (failedCount > maxRetries) {
+                            XLogger.warn(I18n.heartbeatHandlerText.heartbeatRetryExceeded,
+                                    session.getGatewayId(), maxRetries);
+                            session.close(4000, "Heartbeat timeout exceeded max retries");
+                            sessionManager.removeSession(session.getId());
+                            continue;
+                        }
+
                         XLogger.warn(I18n.heartbeatHandlerText.gatewayHeartbeatTimeout,
                                 session.getGatewayId(), elapsedMs);
-                        session.close(4000, "Heartbeat timeout");
-                        sessionManager.removeSession(session.getId());
-                        continue;
                     }
                 }
 
@@ -92,7 +105,7 @@ public class HeartbeatHandler {
         try {
             HeartbeatMessage heartbeat = HeartbeatMessage.builder()
                     .id(UUID.randomUUID().toString())
-                    .agentId("mcp-agent") // TODO: Make this configurable
+                    .gatewayId(session.getGatewayId())
                     .timestamp(Instant.now())
                     .status(buildStatus())
                     .build();
@@ -118,6 +131,7 @@ public class HeartbeatHandler {
         GatewaySession session = sessionManager.getSession(sessionId);
         if (session != null) {
             session.setLastHeartbeatAt(Instant.now());
+            session.setFailedHeartbeatCount(0); // Reset retry counter on successful heartbeat
             XLogger.debug(I18n.heartbeatHandlerText.heartbeatAckReceived, session.getGatewayId());
         }
     }

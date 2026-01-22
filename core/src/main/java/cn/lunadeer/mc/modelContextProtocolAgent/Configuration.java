@@ -9,15 +9,29 @@ public class Configuration extends ConfigurationFile {
     @Comment("Language code for messages. The supported language codes can be found in the 'languages' folder.")
     public static String language = "en_US";
 
-    @Comment("Unique identifier for this MCP Agent instance.")
-    public static String agentId = "mcp-agent-default";
+    public static class AgentInfo extends ConfigurationPart {
+        @Comment("Unique identifier for this MCP Agent instance.")
+        public String agentId = "mcp-agent-default";
+
+        @Comment("Display name for this MCP Agent instance.")
+        public String agentName = "MCP Agent";
+
+        @Comment("Version of this MCP Agent instance.")
+        public String agentVersion = "1.0.0";
+
+        @Comment("Environment (production, development, staging).")
+        public String environment = "production";
+    }
+
+    @Comment("Information about this MCP Agent.")
+    public static AgentInfo agentInfo = new AgentInfo();
 
     public static class WebsocketServer extends ConfigurationPart {
         @Comment("Host address for websocket server.")
         public String host = "127.0.0.1";
 
         @Comment("Port for websocket server.")
-        public int port = 8080;
+        public int port = 8765;
 
         @Comment("Secret key for connection.")
         public String authToken = "ChangeMe!";
@@ -27,6 +41,12 @@ public class Configuration extends ConfigurationFile {
 
         @Comment("Heartbeat timeout in milliseconds.")
         public int heartbeatTimeout = 90000;
+
+        @Comment("Reconnect delay in milliseconds.")
+        public int reconnectDelay = 5000;
+
+        @Comment("Maximum number of retries for failed operations.")
+        public int maxRetries = 3;
 
         @Comment("Maximum number of gateway connections.")
         public int maxConnections = 1;

@@ -6,25 +6,26 @@ import com.google.gson.JsonObject;
 import java.time.Instant;
 
 /**
- * Heartbeat message for connection health monitoring.
+ * Heartbeat message for connection health monitoring (Agent -> Gateway).
+ * Agent sends heartbeat to Gateway to maintain connection.
  *
  * @author ZhangYuheng
  * @since 1.0.0
  */
 public class HeartbeatMessage extends McpMessage {
-    private final String agentId;
+    private final String gatewayId;
     private final Instant timestamp;
     private final AgentStatus status;
 
     private HeartbeatMessage(Builder builder) {
         super(builder.id, "heartbeat");
-        this.agentId = builder.agentId;
+        this.gatewayId = builder.gatewayId;
         this.timestamp = builder.timestamp;
         this.status = builder.status;
     }
 
-    public String getAgentId() {
-        return agentId;
+    public String getGatewayId() {
+        return gatewayId;
     }
 
     public Instant getTimestamp() {
@@ -38,7 +39,7 @@ public class HeartbeatMessage extends McpMessage {
     @Override
     public JsonElement getPayload() {
         JsonObject payload = new JsonObject();
-        payload.addProperty("agentId", agentId);
+        payload.addProperty("gatewayId", gatewayId);
         payload.addProperty("timestamp", timestamp.toString());
         if (status != null) {
             JsonObject statusObj = new JsonObject();
@@ -58,7 +59,7 @@ public class HeartbeatMessage extends McpMessage {
 
     public static class Builder {
         private String id;
-        private String agentId;
+        private String gatewayId;
         private Instant timestamp;
         private AgentStatus status;
 
@@ -67,8 +68,8 @@ public class HeartbeatMessage extends McpMessage {
             return this;
         }
 
-        public Builder agentId(String agentId) {
-            this.agentId = agentId;
+        public Builder gatewayId(String gatewayId) {
+            this.gatewayId = gatewayId;
             return this;
         }
 

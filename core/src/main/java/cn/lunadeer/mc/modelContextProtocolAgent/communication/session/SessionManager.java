@@ -29,6 +29,7 @@ public class SessionManager {
         public String closedAllSessions = "Closed all sessions: {0}";
         public String removingStaleSession = "Removing stale session {0} (inactive for {1}s)";
         public String sessionCleanupError = "Error in session cleanup task: {0}";
+        public String maxConnectionsReached = "Maximum connections reached ({0}), rejecting gateway {1}";
     }
     private final Map<String, GatewaySession> sessions = new ConcurrentHashMap<>();
     private final Map<String, GatewaySession> authenticatedSessions = new ConcurrentHashMap<>();
@@ -47,6 +48,15 @@ public class SessionManager {
      * @param session the session to add
      */
     public void addSession(GatewaySession session) {
+        // Check connection limit
+        int maxConnections = cn.lunadeer.mc.modelContextProtocolAgent.Configuration.websocketServer.maxConnections;
+
+        if (maxConnections > 0 && sessions.size() >= maxConnections) {
+            XLogger.warn(I18n.sessionManagerText.maxConnectionsReached, maxConnections, session.getGatewayId());
+            session.close(4004, "Maximum connections reached");
+            return;
+        }
+
         sessions.put(session.getId(), session);
         XLogger.debug(I18n.sessionManagerText.sessionAdded, session.getId(), session.getGatewayId());
 

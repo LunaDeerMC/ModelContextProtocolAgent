@@ -135,7 +135,7 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
     private void initializeProviderLayer() {
         capabilityRegistry = new CapabilityRegistry();
         eventEmitter = new McpEventEmitterImpl();
-        mcpAgent = new McpAgentImpl(capabilityRegistry, eventEmitter, getDescription().getVersion(), Configuration.agentId);
+        mcpAgent = new McpAgentImpl(capabilityRegistry, eventEmitter, getDescription().getVersion(), Configuration.agentInfo.agentId);
 
         // Register the McpAgent service with Bukkit's service manager
         getServer().getServicesManager().register(McpAgent.class, mcpAgent, this, org.bukkit.plugin.ServicePriority.Normal);
