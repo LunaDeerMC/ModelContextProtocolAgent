@@ -1,4 +1,4 @@
-name: Model Context Protocol Agent
+name: ModelContextProtocolAgent
 version: @version@
 main: cn.lunadeer.mc.modelContextProtocolAgent.ModelContextProtocolAgent
 api-version: '1.20'

@@ -471,7 +471,7 @@ public class AuditLogger {
 
 ```java
 @McpProvider(
-    id = "mcp-agent-core",
+    id = "mcp-agent-internal",
     name = "MCP Core Agent",
     version = "1.0.0"
 )
@@ -647,7 +647,7 @@ public class WorldProvider {
 
 ```java
 @McpProvider(
-    id = "mcp-agent-core",
+    id = "mcp-agent-internal",
     name = "MCP Core Agent",
     version = "1.0.0"
 )
@@ -803,7 +803,7 @@ public class PlayerProvider {
 
 ```java
 @McpProvider(
-    id = "mcp-agent-core",
+    id = "mcp-agent-internal",
     name = "MCP Core Agent",
     version = "1.0.0"
 )
@@ -854,7 +854,7 @@ public class SystemProvider {
 
 ```java
 @McpProvider(
-    id = "mcp-agent-core",
+    id = "mcp-agent-internal",
     name = "MCP Core Agent",
     version = "1.0.0"
 )

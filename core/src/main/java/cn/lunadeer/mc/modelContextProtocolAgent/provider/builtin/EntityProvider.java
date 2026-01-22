@@ -28,7 +28,7 @@ import java.util.List;
  * @since 1.0.0
  */
 @McpProvider(
-    id = "mcp-agent-core",
+    id = "mcp-agent-internal",
     name = "MCP Core Agent",
     version = "1.0.0",
     description = "Built-in capabilities for Minecraft entity management"
