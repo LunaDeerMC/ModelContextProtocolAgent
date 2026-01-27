@@ -77,6 +77,28 @@ public class Configuration extends ConfigurationFile {
     @Comment("Websocket server for gateway to connect.")
     public static WebsocketServer websocketServer = new WebsocketServer();
 
+    public static class InternalModelContextProtocolServer extends ConfigurationPart {
+        @Comment("Enable or disable the internal MCP server on start.")
+        public boolean enableOnStart = false;
+
+        @Comment("Host address for internal MCP server.")
+        public String host = "0.0.0.0";
+
+        @Comment("Port for internal MCP server.")
+        public int port = 8766;
+
+        @Comment("Bearer token for internal MCP server authentication.")
+        public String bearerToken = "ChangeMeToo!";
+    }
+
+    @Comments({
+            "Internal MCP server configuration.",
+            "Provides an basic MCP server for other MCP clients (like Claude Code) to connect to this agent directly.",
+            "Server will start on http://<host>:<port>/mcp",
+            "Connecting clients must provide the bearer token in the 'Authorization' header."
+    })
+    public static InternalModelContextProtocolServer internalModelContextProtocolServer = new InternalModelContextProtocolServer();
+
     @Comment("Enable or disable debug mode.")
     public static boolean debug = false;
 
