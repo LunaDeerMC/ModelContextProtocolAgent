@@ -19,7 +19,6 @@ public class AuthHandler {
     public static class AuthHandlerText extends ConfigurationPart {
         public String authFailedInvalidToken = "Authentication failed for gateway {0}: Invalid token";
         public String gatewayPassedWhitelist = "Gateway {0} passed whitelist check";
-        public String gatewayAuthenticated = "Gateway {0} authenticated successfully with {1} permissions";
         public String gatewayReauthAttempt = "Gateway {0} attempted re-authentication";
     }
 
@@ -47,8 +46,6 @@ public class AuthHandler {
 
         // 4. Grant permissions based on configuration
         Set<String> permissions = getGatewayPermissions(gatewayId);
-
-        XLogger.info(I18n.authHandlerText.gatewayAuthenticated, gatewayId, permissions.size());
 
         return AuthResult.success(permissions);
     }
