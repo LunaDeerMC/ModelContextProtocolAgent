@@ -32,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
 public class AgentWebSocketServer {
 
     public static class AgentWebSocketServerText extends ConfigurationPart {
-        public String wsServerStarted = "MCP Agent WebSocket server started on {0}:{1}";
+        public String wsServerStarted = "MCP Agent WebSocket server for gateway started on {0}:{1}";
         public String wsServerFailed = "Failed to start WebSocket server: {0}";
         public String wsBroadcastFailed = "Failed to broadcast to gateway {0}: {1}";
         public String wsConnectionError = "Error handling connection from gateway {0}: {1}";
