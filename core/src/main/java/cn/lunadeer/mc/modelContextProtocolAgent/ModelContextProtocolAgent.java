@@ -54,11 +54,11 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
 
         // https://patorjk.com/software/taag/#p=display&f=Big&t=MCP-Agent&x=none&v=4&h=4&w=80&we=false
         XLogger.info("  __  __  _____ _____                               _   ");
-        XLogger.info(" |  \\/  |/ ____|  __ \\\\        /\\\\                   | |  ");
-        XLogger.info(" | \\\\  / | |    | |__) |_____ /  \\\\   __ _  ___ _ __ | |_ ");
-        XLogger.info(" | |\\\\/| | |    |  ___/______/ / /\\\\ \\\\ / _` |/ _ \\\\ '_ \\\\| __|");
-        XLogger.info(" | |  | | |____| |         / ____ \\\\ (_| |  __/ | | | |_ ");
-        XLogger.info(" |_|  |_|\\\\_____|_|        /_/    \\\\_\\\\__, |\\\\___|_| |_|\\\\__|");
+        XLogger.info(" |  \\/  |/ ____|  __ \\        /\\                   | |  ");
+        XLogger.info(" | \\  / | |    | |__) |_____ /  \\   __ _  ___ _ __ | |_ ");
+        XLogger.info(" | |\\/| | |    |  ___/______/ /\\ \\ / _` |/ _ \\ '_ \\| __|");
+        XLogger.info(" | |  | | |____| |         / ____ \\ (_| |  __/ | | | |_ ");
+        XLogger.info(" |_|  |_|\\_____|_|        /_/    \\_\\__, |\\___|_| |_|\\__|");
         XLogger.info("                                    __/ |               ");
         XLogger.info("                                   |___/                ");
 
@@ -125,6 +125,7 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
         if (webSocketServer != null) {
             XLogger.info(I18n.mainClassText.websocketStopping);
             webSocketServer.stop();
+            webSocketServer = null;
             XLogger.info(I18n.mainClassText.websocketStopped);
         }
     }

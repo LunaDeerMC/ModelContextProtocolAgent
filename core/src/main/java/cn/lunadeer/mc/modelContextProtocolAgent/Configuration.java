@@ -46,6 +46,9 @@ public class Configuration extends ConfigurationFile {
     );
 
     public static class WebsocketServer extends ConfigurationPart {
+        @Comment("Enable or disable the websocket server on start.")
+        public boolean enableOnStart = true;
+
         @Comment("Host address for websocket server.")
         public String host = "127.0.0.1";
 
