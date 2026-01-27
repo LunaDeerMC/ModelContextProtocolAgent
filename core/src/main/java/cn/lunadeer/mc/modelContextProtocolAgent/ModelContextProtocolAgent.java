@@ -49,7 +49,7 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
         // Plugin startup logic
         instance = this;
         new Notification(this);
-        new XLogger(this);
+        new XLogger(this); XLogger.setDebug(true);
         new Scheduler(this);
 
         // https://patorjk.com/software/taag/#p=display&f=Big&t=MCP-Agent&x=none&v=4&h=4&w=80&we=false

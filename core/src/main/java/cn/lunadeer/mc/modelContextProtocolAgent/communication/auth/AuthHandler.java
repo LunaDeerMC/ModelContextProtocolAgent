@@ -6,6 +6,7 @@ import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -26,7 +27,7 @@ public class AuthHandler {
      * Authenticates a Gateway connection.
      *
      * @param gatewayId the gateway identifier
-     * @param token the authentication token
+     * @param token     the authentication token
      * @return the authentication result
      */
     public AuthResult authenticate(String gatewayId, String token) {
@@ -70,16 +71,22 @@ public class AuthHandler {
 
     /**
      * Gets the permissions for a Gateway.
-     * In a real implementation, this would be configurable per Gateway.
+     * If not explicitly configured, grants default permissions.
      *
      * @param gatewayId the gateway identifier
      * @return the set of permissions
      */
     private Set<String> getGatewayPermissions(String gatewayId) {
-        // For now, grant all permissions to authenticated Gateways
-        // In production, this should be configurable per Gateway
         Set<String> permissions = new HashSet<>();
-        permissions.add("mcp.*"); // Wildcard permission for all MCP operations
+        if (Configuration.gatewayPermissions.containsKey(gatewayId)) {
+            permissions.addAll(Configuration.gatewayPermissions.get(gatewayId));
+        } else {
+            permissions.addAll(Configuration.gatewayPermissions.getOrDefault("default", List.of(
+                    "mcp.capability.execution",
+                    "mcp.capability.event-emitter",
+                    "mcp.capability.command-manager"
+            )));
+        }
         return permissions;
     }
 }

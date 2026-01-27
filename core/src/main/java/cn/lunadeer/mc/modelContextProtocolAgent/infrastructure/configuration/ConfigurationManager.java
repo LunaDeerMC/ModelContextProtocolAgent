@@ -1,11 +1,13 @@
 package cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration;
 
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 /**
@@ -157,6 +159,13 @@ public class ConfigurationManager {
             }
             if (ConfigurationPart.class.isAssignableFrom(field.getType())) {
                 field.set(obj, readConfigurationPart(yaml, (ConfigurationPart) field.get(obj), key));
+            } else if (HashMap.class.isAssignableFrom(field.getType())) {
+                if (missingKey) {
+                    yaml.set(key, field.get(obj));
+                } else {
+                    Class<?> mapValueClass = getMapValueClass(field);
+                    field.set(obj, readMapSection(yaml, mapValueClass, key));
+                }
             } else {
                 if (missingKey) {
                     yaml.set(key, field.get(obj));
@@ -166,6 +175,45 @@ public class ConfigurationManager {
             }
         }
         return obj;
+    }
+
+    private static Class<?> getMapValueClass(Field field) {
+        java.lang.reflect.Type genericType = field.getGenericType();
+        if (genericType instanceof ParameterizedType) {
+            ParameterizedType parameterizedType = (ParameterizedType) genericType;
+            java.lang.reflect.Type typeArgument = parameterizedType.getActualTypeArguments()[1];
+            if (typeArgument instanceof Class) {
+                return (Class<?>) typeArgument;
+            } else if (typeArgument instanceof ParameterizedType) {
+                // Handle nested parameterized types like HashMap<String, List<String>>
+                return (Class<?>) ((ParameterizedType) typeArgument).getRawType();
+            }
+        }
+        // Fallback to Object if we can't determine the type
+        return Object.class;
+    }
+
+    public static HashMap<String, Object> readMapSection(ConfigurationSection yaml, Class<?> mapValueClass, String prefix) {
+        HashMap<String, Object> result = new HashMap<>();
+        ConfigurationSection section = yaml.getConfigurationSection(prefix);
+        if (section == null) {
+            return result;
+        }
+        for (String key : section.getKeys(false)) {
+            if (ConfigurationPart.class.isAssignableFrom(mapValueClass)) {
+                ConfigurationPart partInstance;
+                try {
+                    partInstance = (ConfigurationPart) mapValueClass.getConstructor().newInstance();
+                    readConfigurationPart(section, partInstance, key);
+                    result.put(key, partInstance);
+                } catch (Exception e) {
+                    XLogger.error(e);
+                }
+            } else {
+                result.put(key, section.get(key));
+            }
+        }
+        return result;
     }
 
     /**

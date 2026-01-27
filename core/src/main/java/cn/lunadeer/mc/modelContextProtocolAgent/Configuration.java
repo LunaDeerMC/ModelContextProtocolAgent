@@ -1,8 +1,11 @@
 package cn.lunadeer.mc.modelContextProtocolAgent;
 
-import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.Comment;
-import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationFile;
-import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.ConfigurationPart;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
+import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.configuration.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Configuration extends ConfigurationFile {
 
@@ -25,6 +28,22 @@ public class Configuration extends ConfigurationFile {
 
     @Comment("Information about this MCP Agent.")
     public static AgentInfo agentInfo = new AgentInfo();
+
+    @Comments({
+            "Permissions granted to connected gateways.",
+            "Each gateway can request capabilities based on these permissions.",
+            "The key is the gateway ID, and the value is the list of permissions.",
+            "The 'default' key will be used for gateways not explicitly listed."
+    })
+    public static HashMap<String, List<String>> gatewayPermissions = new HashMap<>(
+            Map.of(
+                    "default", List.of(
+                            "mcp.capability.execution",
+                            "mcp.capability.event-emitter",
+                            "mcp.capability.command-manager"
+                    )
+            )
+    );
 
     public static class WebsocketServer extends ConfigurationPart {
         @Comment("Host address for websocket server.")
@@ -57,5 +76,18 @@ public class Configuration extends ConfigurationFile {
 
     @Comment("Enable or disable debug mode.")
     public static boolean debug = false;
+
+    @PostProcess
+    public void postProcess() {
+        // Ensure default gateway permissions exist
+        if (!gatewayPermissions.containsKey("default")) {
+            XLogger.warn("No default gateway permissions configured, adding default permissions.");
+            gatewayPermissions.put("default", List.of(
+                    "mcp.capability.execution",
+                    "mcp.capability.event-emitter",
+                    "mcp.capability.command-manager"
+            ));
+        }
+    }
 
 }
