@@ -10,6 +10,7 @@ import cn.lunadeer.mc.modelContextProtocolAgent.http_sse.tool.ToolDecorator;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
 import cn.lunadeer.mc.modelContextProtocolAgent.http_sse.message.JsonRpcRequest;
 import cn.lunadeer.mc.modelContextProtocolAgent.http_sse.message.JsonRpcResponse;
+import cn.lunadeer.mc.modelContextProtocolAgentSDK.annotations.Param;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.CapabilityType;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -255,7 +256,16 @@ public class ToolsHandler {
             
             for (int i = 0; i < parameters.length; i++) {
                 java.lang.reflect.Parameter param = parameters[i];
-                String paramName = param.getName();
+                
+                // Get the parameter name from the @Param annotation
+                Param paramAnnotation = param.getAnnotation(Param.class);
+                String paramName;
+                if (paramAnnotation != null && !paramAnnotation.name().isEmpty()) {
+                    paramName = paramAnnotation.name();
+                } else {
+                    // Fallback to the actual parameter name if no annotation or name is empty
+                    paramName = param.getName();
+                }
                 
                 if (params.containsKey(paramName)) {
                     // Convert parameter to expected type

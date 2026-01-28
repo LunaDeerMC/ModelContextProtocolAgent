@@ -11,6 +11,7 @@ import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.dto.LocationParam;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.dto.PaginationParam;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.dto.block.BlockInfo;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.dto.block.BlockListResult;
+import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.dto.block.BlockLocationParam;
 import cn.lunadeer.mc.modelContextProtocolAgentSDK.model.dto.block.BlockSetting;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -71,7 +72,7 @@ public class BlockProvider {
 
         if (material == Material.AIR) {
             return new BlockInfo(
-                    location,
+                    BlockLocationParam.create(location.world(), block.getX(), block.getY(), block.getZ()),
                     material.name(),
                     null,
                     null,
@@ -101,7 +102,7 @@ public class BlockProvider {
         }
 
         return new BlockInfo(
-                location,
+                BlockLocationParam.create(location.world(), block.getX(), block.getY(), block.getZ()),
                 material.name(),
                 blockDataString,
                 properties,
@@ -130,7 +131,7 @@ public class BlockProvider {
     )
     public Boolean setBlock(
             @Param(name = "location", required = true, description = "The location to set the block")
-            LocationParam location,
+            BlockLocationParam location,
             @Param(name = "material", required = true, description = "The block material (e.g., 'STONE', 'DIRT')")
             String material,
             @Param(name = "blockData", description = "Optional block data string (e.g., 'minecraft:stone')")
@@ -146,7 +147,7 @@ public class BlockProvider {
             );
         }
 
-        Block block = world.getBlockAt((int) location.x(), (int) location.y(), (int) location.z());
+        Block block = world.getBlockAt(location.x(), location.y(), location.z());
 
         try {
             Material blockMaterial = Material.getMaterial(material.toUpperCase());
@@ -208,15 +209,15 @@ public class BlockProvider {
         int successCount = 0;
         for (BlockSetting blockSetting : blocks) {
             try {
-                World world = Bukkit.getWorld(blockSetting.location().world());
+                World world = Bukkit.getWorld(blockSetting.blockLocation().world());
                 if (world == null) {
                     continue;
                 }
 
                 Block block = world.getBlockAt(
-                        (int) blockSetting.location().x(),
-                        (int) blockSetting.location().y(),
-                        (int) blockSetting.location().z()
+                        blockSetting.blockLocation().x(),
+                        blockSetting.blockLocation().y(),
+                        blockSetting.blockLocation().z()
                 );
 
                 Material blockMaterial = Material.getMaterial(blockSetting.material().toUpperCase());
@@ -330,7 +331,7 @@ public class BlockProvider {
                         // Ignore parsing errors
                     }
 
-                    LocationParam locationParam = LocationParam.create(worldName, x, y, z);
+                    BlockLocationParam locationParam = BlockLocationParam.create(worldName, x, y, z);
                     blocks.add(new BlockInfo(
                             locationParam,
                             material.name(),
@@ -551,7 +552,7 @@ public class BlockProvider {
     )
     public String getBlockMaterial(
             @Param(name = "location", required = true, description = "The location to query")
-            LocationParam location
+            BlockLocationParam location
     ) {
         World world = Bukkit.getWorld(location.world());
         if (world == null) {
@@ -561,7 +562,7 @@ public class BlockProvider {
             );
         }
 
-        Block block = world.getBlockAt((int) location.x(), (int) location.y(), (int) location.z());
+        Block block = world.getBlockAt(location.x(), location.y(), location.z());
         return block.getType().name();
     }
 
@@ -580,7 +581,7 @@ public class BlockProvider {
     )
     public String getBlockData(
             @Param(name = "location", required = true, description = "The location to query")
-            LocationParam location
+            BlockLocationParam location
     ) {
         World world = Bukkit.getWorld(location.world());
         if (world == null) {
@@ -590,7 +591,7 @@ public class BlockProvider {
             );
         }
 
-        Block block = world.getBlockAt((int) location.x(), (int) location.y(), (int) location.z());
+        Block block = world.getBlockAt(location.x(), location.y(), location.z());
         BlockData blockData = block.getBlockData();
         return blockData.getAsString();
     }
@@ -610,7 +611,7 @@ public class BlockProvider {
     )
     public Integer getBlockLight(
             @Param(name = "location", required = true, description = "The location to query")
-            LocationParam location
+            BlockLocationParam location
     ) {
         World world = Bukkit.getWorld(location.world());
         if (world == null) {
@@ -620,7 +621,7 @@ public class BlockProvider {
             );
         }
 
-        Block block = world.getBlockAt((int) location.x(), (int) location.y(), (int) location.z());
+        Block block = world.getBlockAt(location.x(), location.y(), location.z());
         return Integer.valueOf(block.getLightLevel());
     }
 
