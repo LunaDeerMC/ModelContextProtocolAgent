@@ -9,6 +9,7 @@ import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.ExecutionEngine;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.execution.ExecutionInterceptor;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.permission.PermissionChecker;
 import cn.lunadeer.mc.modelContextProtocolAgent.core.registry.CapabilityRegistry;
+import cn.lunadeer.mc.modelContextProtocolAgent.http_sse.HttpMcpServer;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.I18n;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.Notification;
 import cn.lunadeer.mc.modelContextProtocolAgent.infrastructure.XLogger;
@@ -26,6 +27,7 @@ import java.util.List;
 public final class ModelContextProtocolAgent extends JavaPlugin {
 
     private AgentWebSocketServer webSocketServer;
+    private HttpMcpServer httpMcpServer;
     private McpAgentImpl mcpAgent;
     private CapabilityRegistry capabilityRegistry;
     private McpEventEmitterImpl eventEmitter;
@@ -41,6 +43,11 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
         public String websocketFailed = "Failed to start WebSocket server!";
         public String websocketStopping = "Stopping WebSocket server...";
         public String websocketStopped = "WebSocket server stopped";
+        public String httpServerStarting = "Starting MCP HTTP server...";
+        public String httpServerStarted = "MCP HTTP server started on {0}:{1}";
+        public String httpServerFailed = "Failed to start MCP HTTP server!";
+        public String httpServerStopping = "Stopping MCP HTTP server...";
+        public String httpServerStopped = "MCP HTTP server stopped";
     }
 
     @Override
@@ -66,6 +73,7 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
         initializeProviderLayer();
         registerBuiltInProviders();
         if (Configuration.websocketServer.enableOnStart) startWebSocketServer();
+        if (Configuration.httpSseMcpServer.enableOnStart) startHttpMcpServer();
         registerCommands();
     }
 
@@ -73,6 +81,7 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
     public void onDisable() {
         // Plugin shutdown logic
         stopWebSocketServer();
+        stopHttpMcpServer();
     }
 
     private static ModelContextProtocolAgent instance;
@@ -137,6 +146,51 @@ public final class ModelContextProtocolAgent extends JavaPlugin {
      */
     public AgentWebSocketServer getWebSocketServer() {
         return webSocketServer;
+    }
+
+    /**
+     * Starts the MCP HTTP server.
+     */
+    public void startHttpMcpServer() {
+        try {
+            XLogger.info(I18n.mainClassText.httpServerStarting);
+            httpMcpServer = new HttpMcpServer(
+                    Configuration.httpSseMcpServer.host,
+                    Configuration.httpSseMcpServer.port,
+                    Configuration.httpSseMcpServer.bearerToken,
+                    Configuration.agentInfo.agentId,
+                    Configuration.agentInfo.agentName,
+                    Configuration.agentInfo.agentVersion
+            );
+            httpMcpServer.start();
+            XLogger.info(I18n.mainClassText.httpServerStarted,
+                    Configuration.httpSseMcpServer.host,
+                    Configuration.httpSseMcpServer.port);
+        } catch (Exception e) {
+            XLogger.warn(I18n.mainClassText.httpServerFailed);
+            XLogger.error(e);
+        }
+    }
+
+    /**
+     * Stops the MCP HTTP server.
+     */
+    public void stopHttpMcpServer() {
+        if (httpMcpServer != null) {
+            XLogger.info(I18n.mainClassText.httpServerStopping);
+            httpMcpServer.stop();
+            httpMcpServer = null;
+            XLogger.info(I18n.mainClassText.httpServerStopped);
+        }
+    }
+
+    /**
+     * Gets the MCP HTTP server instance.
+     *
+     * @return the MCP HTTP server
+     */
+    public HttpMcpServer getHttpMcpServer() {
+        return httpMcpServer;
     }
 
     /**
