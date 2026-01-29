@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Built-in MCP provider for block-related capabilities.
@@ -206,39 +207,39 @@ public class BlockProvider {
             );
         }
 
-        int successCount = 0;
+        AtomicInteger successCount = new AtomicInteger();
         for (BlockSetting blockSetting : blocks) {
             try {
                 World world = Bukkit.getWorld(blockSetting.blockLocation().world());
                 if (world == null) {
                     continue;
                 }
+                world.getChunkAtAsyncUrgently(BlockLocationParam.toBukkitLocation(blockSetting.blockLocation()))
+                        .thenAccept((chunk) -> {
+                            Block block = world.getBlockAt(
+                                    blockSetting.blockLocation().x(),
+                                    blockSetting.blockLocation().y(),
+                                    blockSetting.blockLocation().z()
+                            );
 
-                Block block = world.getBlockAt(
-                        blockSetting.blockLocation().x(),
-                        blockSetting.blockLocation().y(),
-                        blockSetting.blockLocation().z()
-                );
+                            Material blockMaterial = Material.getMaterial(blockSetting.material().toUpperCase());
+                            if (blockMaterial == null) return;
 
-                Material blockMaterial = Material.getMaterial(blockSetting.material().toUpperCase());
-                if (blockMaterial == null) {
-                    continue;
-                }
+                            if (blockSetting.blockData() != null && !blockSetting.blockData().isEmpty()) {
+                                BlockData data = Bukkit.createBlockData(blockSetting.blockData());
+                                block.setBlockData(data, update != null ? update : true);
+                            } else {
+                                block.setType(blockMaterial, update != null ? update : true);
+                            }
 
-                if (blockSetting.blockData() != null && !blockSetting.blockData().isEmpty()) {
-                    BlockData data = Bukkit.createBlockData(blockSetting.blockData());
-                    block.setBlockData(data, update != null ? update : true);
-                } else {
-                    block.setType(blockMaterial, update != null ? update : true);
-                }
-
-                successCount++;
+                            successCount.getAndIncrement();
+                        });
             } catch (Exception e) {
                 // Continue with other blocks
             }
         }
 
-        return successCount;
+        return successCount.get();
     }
 
     /**
