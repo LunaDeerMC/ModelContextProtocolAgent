@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -68,47 +69,58 @@ public class BlockProvider {
             );
         }
 
-        Block block = world.getBlockAt((int) location.x(), (int) location.y(), (int) location.z());
-        Material material = block.getType();
+        CompletableFuture<BlockInfo> blockInfoFuture = new CompletableFuture<>();
 
-        if (material == Material.AIR) {
-            return new BlockInfo(
-                    BlockLocationParam.create(location.world(), block.getX(), block.getY(), block.getZ()),
-                    material.name(),
-                    null,
-                    null,
-                    null
-            );
-        }
+        world.getChunkAtAsyncUrgently(BlockLocationParam.toBukkitLocation(
+                BlockLocationParam.create(location.world(), (int) location.x(), (int) location.y(), (int) location.z())
+        )).thenAccept((chunk) -> {
+            Block block = world.getBlockAt((int) location.x(), (int) location.y(), (int) location.z());
+            Material material = block.getType();
 
-        BlockData blockData = block.getBlockData();
-        String blockDataString = blockData.getAsString();
+            if (material == Material.AIR) {
+                // return empty block info for air
+                blockInfoFuture.complete(new BlockInfo(
+                        BlockLocationParam.create(location.world(), block.getX(), block.getY(), block.getZ()),
+                        material.name(),
+                        null,
+                        null,
+                        null
+                ));
+                return;
+            }
 
-        // Get block state properties
-        Map<String, String> properties = new HashMap<>();
-        try {
-            String[] parts = blockDataString.split("\\[");
-            if (parts.length > 1) {
-                String propsStr = parts[1].replace("]", "");
-                String[] propPairs = propsStr.split(",");
-                for (String pair : propPairs) {
-                    String[] keyValue = pair.split("=");
-                    if (keyValue.length == 2) {
-                        properties.put(keyValue[0].trim(), keyValue[1].trim());
+            BlockData blockData = block.getBlockData();
+            String blockDataString = blockData.getAsString();
+
+            // Get block state properties
+            Map<String, String> properties = new HashMap<>();
+            try {
+                String[] parts = blockDataString.split("\\[");
+                if (parts.length > 1) {
+                    String propsStr = parts[1].replace("]", "");
+                    String[] propPairs = propsStr.split(",");
+                    for (String pair : propPairs) {
+                        String[] keyValue = pair.split("=");
+                        if (keyValue.length == 2) {
+                            properties.put(keyValue[0].trim(), keyValue[1].trim());
+                        }
                     }
                 }
+            } catch (Exception e) {
+                // Ignore parsing errors
             }
-        } catch (Exception e) {
-            // Ignore parsing errors
-        }
 
-        return new BlockInfo(
-                BlockLocationParam.create(location.world(), block.getX(), block.getY(), block.getZ()),
-                material.name(),
-                blockDataString,
-                properties,
-                Integer.valueOf(block.getLightLevel())
-        );
+            blockInfoFuture.complete(new BlockInfo(
+                    BlockLocationParam.create(location.world(), block.getX(), block.getY(), block.getZ()),
+                    material.name(),
+                    blockDataString,
+                    properties,
+                    Integer.valueOf(block.getLightLevel())
+            ));
+
+        });
+
+        return blockInfoFuture.join();
     }
 
     /**
@@ -148,33 +160,38 @@ public class BlockProvider {
             );
         }
 
-        Block block = world.getBlockAt(location.x(), location.y(), location.z());
+        CompletableFuture<McpBusinessException> future = new CompletableFuture<>();
+        world.getChunkAtAsyncUrgently(BlockLocationParam.toBukkitLocation(location)).thenAccept((chunk) -> {
+            Block block = world.getBlockAt(location.x(), location.y(), location.z());
 
-        try {
-            Material blockMaterial = Material.getMaterial(material.toUpperCase());
-            if (blockMaterial == null) {
-                throw new McpBusinessException(
+            try {
+                Material blockMaterial = Material.getMaterial(material.toUpperCase());
+                if (blockMaterial == null) {
+                    future.complete(new McpBusinessException(
+                            ErrorCode.OPERATION_FAILED.getErrorCode(),
+                            "Invalid material: " + material
+                    ));
+                    return;
+                }
+
+                if (blockData != null && !blockData.isEmpty()) {
+                    // Use block data string
+                    BlockData data = Bukkit.createBlockData(blockData);
+                    block.setBlockData(data, update != null ? update : true);
+                } else {
+                    // Use material only
+                    block.setType(blockMaterial, update != null ? update : true);
+                }
+                future.complete(null);
+            } catch (Exception e) {
+                future.complete(new McpBusinessException(
                         ErrorCode.OPERATION_FAILED.getErrorCode(),
-                        "Invalid material: " + material
-                );
+                        "Failed to set block: " + e.getMessage()
+                ));
             }
+        });
 
-            if (blockData != null && !blockData.isEmpty()) {
-                // Use block data string
-                BlockData data = Bukkit.createBlockData(blockData);
-                block.setBlockData(data, update != null ? update : true);
-            } else {
-                // Use material only
-                block.setType(blockMaterial, update != null ? update : true);
-            }
-
-            return true;
-        } catch (Exception e) {
-            throw new McpBusinessException(
-                    ErrorCode.OPERATION_FAILED.getErrorCode(),
-                    "Failed to set block: " + e.getMessage()
-            );
-        }
+        return future.join() == null;
     }
 
     /**

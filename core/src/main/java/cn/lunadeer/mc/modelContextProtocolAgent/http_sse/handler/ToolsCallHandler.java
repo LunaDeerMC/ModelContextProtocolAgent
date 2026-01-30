@@ -142,8 +142,15 @@ public class ToolsCallHandler {
                     Object paramValue = params.get(paramName);
                     args[i] = parameterConverter.convertParameter(paramValue, param);
                 } else {
-                    // Use default value or null
-                    args[i] = parameterConverter.getDefaultValue(param.getType());
+                    // Use default value from @Param annotation if available, otherwise use type-based default
+                    if (paramAnnotation != null && !paramAnnotation.defaultValue().isEmpty()) {
+                        args[i] = parameterConverter.convertParameter(
+                                parameterConverter.parseDefaultValue(paramAnnotation.defaultValue()),
+                                param
+                        );
+                    } else {
+                        args[i] = parameterConverter.getDefaultValue(param.getType());
+                    }
                 }
             }
 

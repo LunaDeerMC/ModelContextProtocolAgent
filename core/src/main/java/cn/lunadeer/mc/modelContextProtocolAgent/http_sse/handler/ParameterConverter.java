@@ -186,12 +186,45 @@ public class ParameterConverter {
      * Gets a default value for a parameter type.
      */
     public Object getDefaultValue(Class<?> type) {
-        if (type == int.class || type == long.class || type == double.class || type == float.class) {
+        if (type == int.class || type == Integer.class) {
             return 0;
-        } else if (type == boolean.class) {
+        } else if (type == long.class || type == Long.class) {
+            return 0L;
+        } else if (type == double.class || type == Double.class) {
+            return 0.0;
+        } else if (type == float.class || type == Float.class) {
+            return 0.0f;
+        } else if (type == boolean.class || type == Boolean.class) {
             return false;
         } else {
             return null;
+        }
+    }
+
+    /**
+     * Parses a default value string to appropriate type.
+     *
+     * @param defaultValue the default value string
+     * @return parsed value
+     */
+    public Object parseDefaultValue(String defaultValue) {
+        if (defaultValue == null || defaultValue.isEmpty()) {
+            return null;
+        }
+
+        if ("true".equalsIgnoreCase(defaultValue) || "false".equalsIgnoreCase(defaultValue)) {
+            return Boolean.parseBoolean(defaultValue);
+        }
+
+        try {
+            if (defaultValue.contains(".")) {
+                return Double.parseDouble(defaultValue);
+            } else {
+                return Integer.parseInt(defaultValue);
+            }
+        } catch (NumberFormatException e) {
+            // Return as string
+            return defaultValue;
         }
     }
 }
