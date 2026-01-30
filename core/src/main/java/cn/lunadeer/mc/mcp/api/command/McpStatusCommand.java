@@ -4,6 +4,7 @@ import cn.lunadeer.mc.mcp.Configuration;
 import cn.lunadeer.mc.mcp.MinecraftContextProtocolServer;
 import cn.lunadeer.mc.mcp.server.websocket_gateway.WebSocketServer;
 import cn.lunadeer.mc.mcp.server.websocket_gateway.session.SessionManager;
+import cn.lunadeer.mc.mcp.server.http_sse.HttpServer;
 import cn.lunadeer.mc.mcp.core.registry.CapabilityRegistry;
 import cn.lunadeer.mc.mcp.sdk.model.CapabilityType;
 import cn.lunadeer.mc.mcp.sdk.model.CapabilityManifest;
@@ -36,6 +37,7 @@ public class McpStatusCommand extends McpCommand {
         }
 
         WebSocketServer server = plugin.getWebSocketServer();
+        HttpServer httpServer = plugin.getHttpMcpServer();
         CapabilityRegistry registry = plugin.getCapabilityRegistry();
 
         sendMessage(sender, "§6=== MCP Server Status ===");
@@ -51,12 +53,23 @@ public class McpStatusCommand extends McpCommand {
             sendMessage(sender, "§7WebSocket Server: §cStopped");
         }
 
+        // HTTP Server Status
+        if (httpServer != null) {
+            sendMessage(sender, "§7HTTP Server: §aRunning");
+            sendMessage(sender, "§7  Host: §f" + Configuration.httpSseMcpServer.host);
+            sendMessage(sender, "§7  Port: §f" + Configuration.httpSseMcpServer.port);
+            sendMessage(sender, "§7  URL: §f" + httpServer.getUrl());
+            sendMessage(sender, "§7  Active Sessions: §f" + httpServer.getSessionCount());
+        } else {
+            sendMessage(sender, "§7HTTP Server: §cStopped");
+        }
+
         // Session Status
         SessionManager sessionManager = server != null ? server.getSessionManager() : null;
         if (sessionManager != null) {
             int totalSessions = sessionManager.getAllSessions().size();
             int authenticatedSessions = sessionManager.getAuthenticatedSessions().size();
-            sendMessage(sender, "§7Active Sessions: §f" + authenticatedSessions + "§7/§f" + totalSessions);
+            sendMessage(sender, "§7Gateway Sessions: §f" + authenticatedSessions + "§7/§f" + totalSessions);
         }
 
         // Capability Status
